@@ -1,98 +1,21 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Menu, X, Flame, ShieldCheck, BookOpen, CalendarCheck, Compass,
-  Video, Upload, Square, Play, ChevronRight, LogOut, User,
-  CheckCircle2, Circle, Quote, ArrowRight, Lock, Mail, NotebookPen, Target
+  Video, Upload, Square, Play, ChevronRight, ChevronDown, LogOut, User,
+  CheckCircle2, Circle, Quote, ArrowRight, Lock, Mail, NotebookPen, Target,
+  Server
 } from "lucide-react";
 import { supabase } from "./dataService";
+import { T, Crest, Eyebrow, Btn, Card } from "./ui";
+import { AdminScreen, SystemsScreen, OWNER_NAV, SYSTEMS_SUB, ADMIN_TITLES } from "./admin";
 
 /* ============================================================================
    KINGDOM OF DISCIPLINED MEN — Member App
    Larry Beacham · Tampa, FL
-   Auth + profile (streak) wired to Supabase. Program/check-in data is local
-   for now — tables + video storage come next.
+   Auth + profile wired to Supabase. Owner ("Command") admin + Systems layer
+   reads/writes the live tables (profiles, memories, notepad, robots,
+   ai_constitution, update_log) under owner-only RLS.
    ========================================================================== */
-
-const T = {
-  obsidian: "#0a0907",
-  obsidian2: "#100e0b",
-  surface: "#16130d",
-  surface2: "#1e1810",
-  line: "rgba(216,168,92,.18)",
-  lineSoft: "rgba(216,168,92,.10)",
-  bronze: "#c8862e",
-  bronzeLt: "#f1c878",
-  bronzeGlow: "#e7ab4c",
-  ember: "#9a2d16",
-  emberLt: "#d4502b",
-  emberHot: "#ff6a3c",
-  cream: "#f7f1e6",
-  muted: "#a99d89",
-  muted2: "#6e6557",
-  gold: "linear-gradient(120deg,#f6d488 0%,#c8862e 45%,#d4502b 100%)",
-  reg: "'Cinzel',Georgia,serif",
-  display: "'Anton',Impact,sans-serif",
-  serif: "'Fraunces',Georgia,serif",
-  body: "'Hanken Grotesk',system-ui,sans-serif",
-};
-
-/* ---------- Crest ---------- */
-function Crest({ size = 40 }) {
-  return (
-    <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden>
-      <defs>
-        <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f6d488" />
-          <stop offset=".5" stopColor="#c8862e" />
-          <stop offset="1" stopColor="#d4502b" />
-        </linearGradient>
-      </defs>
-      <path d="M32 3 L57 13 V31 C57 47 46 56 32 61 C18 56 7 47 7 31 V13 Z"
-        fill="none" stroke="url(#cg)" strokeWidth="2" />
-      <path d="M32 16 V46 M22 26 H42" stroke="url(#cg)" strokeWidth="2.4" strokeLinecap="round" />
-      <circle cx="32" cy="22" r="2.4" fill="url(#cg)" />
-    </svg>
-  );
-}
-
-/* ---------- shared bits ---------- */
-const Eyebrow = ({ children }) => (
-  <span style={{
-    fontFamily: T.reg, fontSize: 11, letterSpacing: ".28em", textTransform: "uppercase",
-    color: T.bronze, display: "inline-flex", alignItems: "center", gap: 8,
-  }}>
-    <span style={{ width: 22, height: 1, background: T.bronze, opacity: .6 }} />
-    {children}
-  </span>
-);
-
-function Btn({ children, onClick, kind = "solid", full, type = "button", disabled }) {
-  const base = {
-    fontFamily: T.reg, fontWeight: 600, fontSize: 13, letterSpacing: ".06em",
-    padding: "13px 22px", borderRadius: 2, cursor: disabled ? "not-allowed" : "pointer",
-    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
-    width: full ? "100%" : "auto", border: "1px solid transparent",
-    transition: "transform .15s, filter .2s", opacity: disabled ? .5 : 1,
-  };
-  const styles = kind === "solid"
-    ? { ...base, background: T.gold, color: "#1a1206", boxShadow: "0 6px 26px rgba(200,134,46,.28)" }
-    : { ...base, background: "transparent", color: T.bronzeLt, border: `1px solid ${T.line}` };
-  return (
-    <button type={type} onClick={onClick} disabled={disabled} style={styles}
-      onMouseDown={e => (e.currentTarget.style.transform = "translateY(1px)")}
-      onMouseUp={e => (e.currentTarget.style.transform = "translateY(0)")}
-      onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}>
-      {children}
-    </button>
-  );
-}
-
-const Card = ({ children, pad = 22, style }) => (
-  <div style={{
-    background: `linear-gradient(180deg,${T.surface},${T.obsidian2})`,
-    border: `1px solid ${T.line}`, borderRadius: 4, padding: pad, ...style,
-  }}>{children}</div>
-);
 
 /* ============================================================================
    LOGIN
@@ -183,7 +106,8 @@ const PROGRAMS = {
 /* ============================================================================
    SIDE MENU
    ========================================================================== */
-function SideMenu({ open, onClose, go, view, user, onLogout }) {
+function SideMenu({ open, onClose, go, view, user, onLogout, isOwner }) {
+  const [sysOpen, setSysOpen] = useState(false);
   const items = [
     { id: "dashboard", label: "The Forge", icon: Flame },
     { id: "p30", label: "30-Day Intensive", icon: ShieldCheck },
@@ -191,6 +115,28 @@ function SideMenu({ open, onClose, go, view, user, onLogout }) {
     { id: "checkin", label: "Daily Check-In", icon: CalendarCheck },
     { id: "profile", label: "My Profile", icon: User },
   ];
+  const navBtn = (it, opts = {}) => {
+    const active = view === it.id;
+    const Icon = it.icon;
+    return (
+      <button key={it.id} onClick={() => { go(it.id); if (!opts.keepOpen) onClose(); }} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 13,
+        padding: opts.sub ? "10px 14px 10px 30px" : "13px 14px",
+        background: active ? "rgba(200,134,46,.12)" : "transparent",
+        border: "none", borderLeft: `2px solid ${active ? T.bronze : "transparent"}`,
+        color: active ? T.bronzeLt : T.muted, cursor: "pointer", fontFamily: T.reg,
+        fontSize: opts.sub ? 12.5 : 13.5, letterSpacing: ".03em", borderRadius: 2, marginBottom: 2,
+      }}>
+        <Icon size={opts.sub ? 15 : 17} /> {it.label}
+        {active && <ChevronRight size={13} style={{ marginLeft: "auto" }} />}
+      </button>
+    );
+  };
+  const sectionLabel = (txt) => (
+    <div style={{ fontFamily: T.reg, fontSize: 10, letterSpacing: ".22em", textTransform: "uppercase", color: T.muted2, padding: "14px 14px 6px", display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ width: 14, height: 1, background: T.line }} /> {txt}
+    </div>
+  );
   return (
     <>
       <div onClick={onClose} style={{
@@ -212,23 +158,28 @@ function SideMenu({ open, onClose, go, view, user, onLogout }) {
           <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", color: T.muted, cursor: "pointer" }}><X size={20} /></button>
         </div>
 
-        <nav style={{ padding: 12, flex: 1 }}>
-          {items.map(it => {
-            const active = view === it.id;
-            const Icon = it.icon;
-            return (
-              <button key={it.id} onClick={() => { go(it.id); onClose(); }} style={{
+        <nav style={{ padding: 12, flex: 1, overflowY: "auto" }}>
+          {items.map(it => navBtn(it))}
+
+          {isOwner && (
+            <>
+              {sectionLabel("Command")}
+              {OWNER_NAV.map(it => navBtn(it))}
+
+              {/* Systems — expandable parent with sub-menu */}
+              <button onClick={() => setSysOpen(o => !o)} style={{
                 width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "13px 14px",
-                background: active ? "rgba(200,134,46,.12)" : "transparent",
-                border: "none", borderLeft: `2px solid ${active ? T.bronze : "transparent"}`,
-                color: active ? T.bronzeLt : T.muted, cursor: "pointer", fontFamily: T.reg,
+                background: view.startsWith("sys") ? "rgba(200,134,46,.12)" : "transparent",
+                border: "none", borderLeft: `2px solid ${view.startsWith("sys") ? T.bronze : "transparent"}`,
+                color: view.startsWith("sys") ? T.bronzeLt : T.muted, cursor: "pointer", fontFamily: T.reg,
                 fontSize: 13.5, letterSpacing: ".03em", borderRadius: 2, marginBottom: 2,
               }}>
-                <Icon size={17} /> {it.label}
-                {active && <ChevronRight size={14} style={{ marginLeft: "auto" }} />}
+                <Server size={17} /> Systems
+                {sysOpen ? <ChevronDown size={14} style={{ marginLeft: "auto" }} /> : <ChevronRight size={14} style={{ marginLeft: "auto" }} />}
               </button>
-            );
-          })}
+              {sysOpen && SYSTEMS_SUB.map(it => navBtn(it, { sub: true }))}
+            </>
+          )}
         </nav>
 
         <div style={{ padding: 16, borderTop: `1px solid ${T.lineSoft}` }}>
@@ -238,7 +189,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout }) {
               alignItems: "center", justifyContent: "center", color: "#1a1206", fontFamily: T.reg, fontWeight: 700,
             }}>{(user.name[0] || "M").toUpperCase()}</div>
             <div style={{ overflow: "hidden" }}>
-              <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, textTransform: "capitalize" }}>{user.name}</div>
+              <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, textTransform: "capitalize" }}>{user.name}{isOwner && <span style={{ color: T.bronze, fontSize: 10, letterSpacing: ".1em", marginLeft: 6 }}>OWNER</span>}</div>
               <div style={{ fontFamily: T.body, fontSize: 11, color: T.muted2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email}</div>
             </div>
           </div>
@@ -733,12 +684,13 @@ export default function App() {
   );
   if (!user) return <Login />;
 
-  const titles = { dashboard: "The Forge", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile" };
+  const isOwner = profile?.role === "owner";
+  const titles = { dashboard: "The Forge", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", ...ADMIN_TITLES };
 
   return (
     <div style={{ minHeight: "100vh", background: T.obsidian, color: T.cream, fontFamily: T.body }}>
       <SideMenu open={menu} onClose={() => setMenu(false)} go={setView} view={view} user={user}
-        onLogout={logout} />
+        onLogout={logout} isOwner={isOwner} />
 
       {/* top bar */}
       <header style={{
@@ -762,6 +714,15 @@ export default function App() {
         {view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
         {view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}
         {view === "profile" && <Profile user={user} streak={streak} checkins={checkins} />}
+
+        {/* Owner Command + Systems (UI gate; RLS enforces at the DB regardless) */}
+        {isOwner && (view.startsWith("admin_") || view === "gideon") && <AdminScreen view={view} profile={profile} />}
+        {isOwner && (view === "systems" || view.startsWith("sys_")) && <SystemsScreen view={view} go={setView} />}
+        {!isOwner && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems") && (
+          <div style={{ maxWidth: 520, margin: "40px auto 0", textAlign: "center" }}>
+            <p style={{ fontFamily: T.serif, fontStyle: "italic", color: T.bronzeLt, fontSize: 16 }}>This gate is for the owner alone.</p>
+          </div>
+        )}
       </main>
     </div>
   );
