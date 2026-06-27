@@ -239,6 +239,19 @@
   .leader{position:relative;display:grid;grid-template-columns:.85fr 1.15fr;gap:3.2rem;align-items:center}
   .leader.flip{grid-template-columns:1.15fr .85fr}
   .leader.flip .leader-copy{order:-1}
+  .action{padding-top:0}
+  .action .sec-head{margin-bottom:2rem}
+  .action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4rem}
+  .shot{position:relative;border-radius:4px;overflow:hidden;border:1px solid var(--line);aspect-ratio:4/3;background:#100e0b}
+  .shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+  .shot:hover img{transform:scale(1.04)}
+  .shot .corner{position:absolute;width:22px;height:22px;border:2px solid var(--bronze);z-index:3}
+  .shot .corner.tl{top:11px;left:11px;border-right:none;border-bottom:none}
+  .shot .corner.br{bottom:11px;right:11px;border-left:none;border-top:none}
+  .shot .cap{position:absolute;left:0;bottom:0;width:100%;padding:1rem 1.1rem;z-index:3;
+    font-family:var(--reg);font-weight:600;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--cream);
+    background:linear-gradient(0deg,rgba(8,7,5,.82),transparent)}
+  @media(max-width:740px){.action-grid{grid-template-columns:1fr;gap:1.1rem}.shot{aspect-ratio:16/10}}
   .portrait{position:relative;aspect-ratio:4/5;border-radius:4px;overflow:hidden;border:1px solid var(--line);
     background:radial-gradient(circle at 50% 30%,rgba(231,171,76,.16),transparent 60%),linear-gradient(160deg,#211a12,#0d0b08);
     box-shadow:0 40px 90px -32px rgba(0,0,0,.9)}
@@ -604,7 +617,7 @@
            add <img class="photo" src="larry.jpg" alt="Larry Beacham"> inside .portrait and remove the <svg class="silh"> -->
       <div class="portrait">
         <span class="corner tl"></span><span class="corner br"></span>
-        <svg class="silh" viewBox="0 0 100 120" fill="currentColor"><circle cx="50" cy="34" r="20"/><path d="M50 56c-24 0-40 16-40 40v24h80V96c0-24-16-40-40-40z"/></svg>
+        <img class="photo" src="assets/larry-headshot.jpg" alt="Larry Beacham, Founder and Head Coach" loading="lazy">
         <div class="tag"><b>Larry Beacham</b><span>Founder · Head Coach</span></div>
       </div>
       <div class="leader-copy">
@@ -622,6 +635,33 @@
   </div>
 </section>
 
+<!-- ===== LARRY IN ACTION ===== -->
+<section class="block leader-wrap action" id="larry-action">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>In the Arena</h2>
+      <span class="num reg">— On Stage &amp; In the Trenches</span>
+    </div>
+    <div class="action-grid reveal">
+      <figure class="shot">
+        <span class="corner tl"></span><span class="corner br"></span>
+        <img src="assets/larry-superman.jpg" alt="Larry Beacham speaking at the Made for More Conference" loading="lazy">
+        <figcaption class="cap">Made for More Conference</figcaption>
+      </figure>
+      <figure class="shot">
+        <span class="corner tl"></span><span class="corner br"></span>
+        <img src="assets/larry-candid.jpg" alt="Larry Beacham with an attendee" loading="lazy">
+        <figcaption class="cap">With the Brotherhood</figcaption>
+      </figure>
+      <figure class="shot">
+        <span class="corner tl"></span><span class="corner br"></span>
+        <img src="assets/larry-testimonial.jpg" alt="A word of thanks from the community" loading="lazy">
+        <figcaption class="cap">Years of Value</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
 <!-- ===== ROLANDA ===== -->
 <section class="block leader-wrap" id="rolanda" style="background:linear-gradient(180deg,rgba(16,14,11,.5),var(--obsidian))">
   <div class="wrap">
@@ -632,8 +672,8 @@
       <!-- PORTRAIT: replace silhouette with Rolanda's real photo (same pattern as Larry's) -->
       <div class="portrait">
         <span class="corner tl"></span><span class="corner br"></span>
-        <svg class="silh" viewBox="0 0 100 120" fill="currentColor"><circle cx="50" cy="34" r="20"/><path d="M50 56c-24 0-40 16-40 40v24h80V96c0-24-16-40-40-40z"/></svg>
-        <div class="tag"><b>Rolanda Beacham</b><span>Co-Founder · "Ms. Ro"</span></div>
+        <img class="photo" src="assets/larry-rolanda.jpg" alt="Larry and Rolanda Beacham" loading="lazy">
+        <div class="tag"><b>Rolanda Beacham</b><span>Co-Founder · &quot;Ms. Ro&quot;</span></div>
       </div>
       <div class="leader-copy">
         <h2><span class="reg">The Heart of the House</span>Rolanda Beacham</h2>
