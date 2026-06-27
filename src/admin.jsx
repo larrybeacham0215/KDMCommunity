@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Users, Brain, NotebookPen, Bot, Cpu, ScrollText, Plug, Workflow, Webhook,
   KeyRound, Activity, LayoutGrid, Plus, Trash2, Save, RefreshCw, Power,
@@ -262,23 +262,40 @@ function Gideon() {
   const { rows, loading } = useTable("robots", "created_at");
   const gideon = rows.find(r => (r.name || "").toLowerCase() === "gideon") || rows[0];
   const [text, setText] = useState("");
-  const online = false; // flips true once the edge function + ANTHROPIC_API_KEY exist
+  const [msgs, setMsgs] = useState([]);
+  const [sending, setSending] = useState(false);
+  const scroller = useRef(null);
+  const online = true;
+
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, [msgs, sending]);
+
+  const send = async () => {
+    const content = text.trim();
+    if (!content || sending) return;
+    const next = [...msgs, { role: "user", content }];
+    setMsgs(next); setText(""); setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gideon", { body: { messages: next } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setMsgs(m => [...m, { role: "assistant", content: data.reply }]);
+    } catch (e) {
+      setMsgs(m => [...m, { role: "assistant", content: "⚠ " + (e?.message || "Gideon couldn't respond just now. Try again."), error: true }]);
+    } finally { setSending(false); }
+  };
 
   return (
     <Wrap>
       <Head kicker="Command · Robot" title="Gideon AI"
         sub="Your primary operational assistant — summaries, drafts, logging, and memory, governed by the AI Constitution." />
 
-      {/* offline notice */}
-      <Card pad={16} style={{ marginBottom: 16, borderColor: "rgba(231,171,76,.35)", background: "linear-gradient(180deg,#1d1407,#120d06)" }}>
-        <div style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
-          <AlertTriangle size={18} color={T.bronzeLt} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
-            <div style={{ fontFamily: T.reg, fontSize: 13, color: T.bronzeLt, letterSpacing: ".04em", marginBottom: 3 }}>Gideon is offline</div>
-            <p style={{ fontFamily: T.body, fontSize: 13, color: T.muted, lineHeight: 1.55 }}>
-              The chat is built and ready. To bring him online, add <b style={{ color: T.cream }}>ANTHROPIC_API_KEY</b> as a secret on a Supabase edge function (server-side only — never in the app bundle). Once the key is set, flip <code style={{ color: T.bronzeLt }}>online</code> to true and wire the send handler to the function.
-            </p>
-          </div>
+      {/* online status */}
+      <Card pad={14} style={{ marginBottom: 16, borderColor: "rgba(231,171,76,.3)" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#7bbf6a", boxShadow: "0 0 8px #7bbf6a", flexShrink: 0 }} />
+          <span style={{ fontFamily: T.body, fontSize: 13, color: T.cream }}>
+            Gideon is <b style={{ color: T.bronzeLt }}>online</b> — running on the Anthropic API through a secure Supabase edge function. The key stays server-side.
+          </span>
         </div>
       </Card>
 
@@ -301,21 +318,43 @@ function Gideon() {
 
       {/* chat surface */}
       <Card pad={0} style={{ overflow: "hidden" }}>
-        <div style={{ padding: 18, minHeight: 220, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div ref={scroller} style={{ padding: 18, maxHeight: 420, minHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* greeting (display only) */}
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(231,171,76,.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={15} color={T.bronzeLt} /></div>
-            <div style={{ background: T.surface2, border: `1px solid ${T.lineSoft}`, borderRadius: "2px 10px 10px 10px", padding: "11px 14px", maxWidth: "80%" }}>
+            <div style={{ background: T.surface2, border: `1px solid ${T.lineSoft}`, borderRadius: "2px 10px 10px 10px", padding: "11px 14px", maxWidth: "82%" }}>
               <p style={{ fontFamily: T.body, fontSize: 14, color: T.cream, lineHeight: 1.5 }}>
-                Peace, Larry. I'm Gideon. Once my key is set I'll help you run the Kingdom — summaries, drafts, logging, and recall. I won't fabricate, and I never cross one man's privacy.
+                Peace, Larry. I'm Gideon. Ask me anything — summaries, drafts, planning, or recall. I won't fabricate, and I never cross a man's privacy.
               </p>
             </div>
           </div>
+
+          {msgs.map((m, i) => m.role === "user" ? (
+            <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ background: "rgba(200,134,46,.16)", border: `1px solid ${T.line}`, borderRadius: "10px 2px 10px 10px", padding: "11px 14px", maxWidth: "82%" }}>
+                <p style={{ fontFamily: T.body, fontSize: 14, color: T.cream, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.content}</p>
+              </div>
+            </div>
+          ) : (
+            <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(231,171,76,.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={15} color={m.error ? T.emberHot : T.bronzeLt} /></div>
+              <div style={{ background: T.surface2, border: `1px solid ${m.error ? "rgba(212,80,43,.4)" : T.lineSoft}`, borderRadius: "2px 10px 10px 10px", padding: "11px 14px", maxWidth: "82%" }}>
+                <p style={{ fontFamily: T.body, fontSize: 14, color: m.error ? T.emberLt : T.cream, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.content}</p>
+              </div>
+            </div>
+          ))}
+
+          {sending && (
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(231,171,76,.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={15} color={T.bronzeLt} /></div>
+              <span style={{ fontFamily: T.body, fontSize: 13, color: T.muted2 }}>Gideon is thinking…</span>
+            </div>
+          )}
         </div>
         <div style={{ borderTop: `1px solid ${T.lineSoft}`, padding: 12, display: "flex", gap: 10, alignItems: "center", background: T.obsidian }}>
-          <input disabled={!online} value={text} onChange={e => setText(e.target.value)}
-            placeholder={online ? "Message Gideon…" : "Gideon is offline — add the API key to enable"}
-            style={{ ...inputBase, opacity: online ? 1 : .6 }} />
-          <Btn disabled={!online}><Send size={15} /></Btn>
+          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
+            placeholder="Message Gideon…" style={inputBase} />
+          <Btn onClick={send} disabled={sending || !text.trim()}><Send size={15} /></Btn>
         </div>
       </Card>
     </Wrap>
