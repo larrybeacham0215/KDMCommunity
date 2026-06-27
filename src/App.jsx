@@ -4,11 +4,13 @@ import {
   Video, Upload, Square, Play, ChevronRight, LogOut, User,
   CheckCircle2, Circle, Quote, ArrowRight, Lock, Mail, NotebookPen, Target
 } from "lucide-react";
+import { supabase } from "./dataService";
 
 /* ============================================================================
-   KINGDOM OF DISCIPLINED MEN — Member App (framework / test build)
+   KINGDOM OF DISCIPLINED MEN — Member App
    Larry Beacham · Tampa, FL
-   Auth + data are mocked in React state. Supabase wires in later.
+   Auth + profile (streak) wired to Supabase. Program/check-in data is local
+   for now — tables + video storage come next.
    ========================================================================== */
 
 const T = {
@@ -95,16 +97,20 @@ const Card = ({ children, pad = 22, style }) => (
 /* ============================================================================
    LOGIN
    ========================================================================== */
-function Login({ onLogin }) {
+function Login() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setErr("Enter a valid email.");
-    if (pw.length < 4) return setErr("Enter your password.");
-    setErr("");
-    onLogin({ email, name: email.split("@")[0] });
+    if (!pw) return setErr("Enter your password.");
+    setErr(""); setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw });
+    setLoading(false);
+    if (error) setErr(error.message || "Login failed. Check your email and password.");
+    // success → App's onAuthStateChange picks up the session
   };
 
   const inputStyle = {
@@ -142,9 +148,9 @@ function Login({ onLogin }) {
               onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
           </div>
           {err && <p style={{ color: T.emberHot, fontFamily: T.body, fontSize: 13, marginBottom: 12 }}>{err}</p>}
-          <Btn full onClick={submit}>Enter <ArrowRight size={15} /></Btn>
+          <Btn full onClick={submit} disabled={loading}>{loading ? "Entering…" : <>Enter <ArrowRight size={15} /></>}</Btn>
           <p style={{ textAlign: "center", marginTop: 16, color: T.muted2, fontFamily: T.body, fontSize: 12 }}>
-            Access is granted by application. Auth connects to Supabase next.
+            Access is granted by application. Use the email and password set up for you.
           </p>
         </Card>
       </div>
@@ -673,12 +679,41 @@ function Profile({ user, streak, checkins }) {
    ROOT
    ========================================================================== */
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [view, setView] = useState("dashboard");
   const [menu, setMenu] = useState(false);
-  const [streak, setStreak] = useState(4);
   const [checkins, setCheckins] = useState([]);
   const [progress] = useState({ p30: 12, p90: 27 });
+
+  const streak = profile?.streak ?? 0;
+  const user = session?.user
+    ? { email: session.user.email, name: profile?.full_name || session.user.email.split("@")[0] }
+    : null;
+
+  // auth session bootstrap + listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthReady(true); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); setView("dashboard"); });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // load profile for the signed-in user
+  useEffect(() => {
+    if (!session?.user) { setProfile(null); return; }
+    supabase.from("profiles").select("*").eq("id", session.user.id).single()
+      .then(({ data }) => { if (data) setProfile(data); });
+  }, [session]);
+
+  const bumpStreak = () => {
+    if (!session?.user) return;
+    const next = (profile?.streak ?? 0) + 1;
+    setProfile(p => ({ ...(p || {}), streak: next }));
+    supabase.from("profiles").update({ streak: next }).eq("id", session.user.id).then(() => {});
+  };
+
+  const logout = async () => { setMenu(false); await supabase.auth.signOut(); };
 
   // inject fonts + keyframes once
   useEffect(() => {
@@ -691,14 +726,19 @@ export default function App() {
     document.head.appendChild(s);
   }, []);
 
-  if (!user) return <Login onLogin={u => { setUser(u); setView("dashboard"); }} />;
+  if (!authReady) return (
+    <div style={{ minHeight: "100vh", background: T.obsidian, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Crest size={48} />
+    </div>
+  );
+  if (!user) return <Login />;
 
   const titles = { dashboard: "The Forge", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile" };
 
   return (
     <div style={{ minHeight: "100vh", background: T.obsidian, color: T.cream, fontFamily: T.body }}>
       <SideMenu open={menu} onClose={() => setMenu(false)} go={setView} view={view} user={user}
-        onLogout={() => { setUser(null); setMenu(false); }} />
+        onLogout={logout} />
 
       {/* top bar */}
       <header style={{
@@ -720,7 +760,7 @@ export default function App() {
         {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} />}
         {view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
         {view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
-        {view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={() => setStreak(s => s + 1)} />}
+        {view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}
         {view === "profile" && <Profile user={user} streak={streak} checkins={checkins} />}
       </main>
     </div>
