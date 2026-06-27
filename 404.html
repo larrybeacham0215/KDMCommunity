@@ -104,6 +104,13 @@
   .btn.ghost::after{display:none}
   .btn.ghost:hover{border-color:var(--bronze);color:var(--bronze-lt);box-shadow:none}
   .btn .arr{transition:transform .3s}.btn:hover .arr{transform:translateX(4px)}
+  .nav-links a.btn{color:#1a1206;text-shadow:0 1px 0 rgba(255,255,255,.18)}
+  .nav-links a.btn:hover{color:#120c04}
+  /* mobile menu scrim + scroll lock */
+  .nav-scrim{position:fixed;inset:0;background:rgba(5,4,3,.62);backdrop-filter:blur(3px);
+    opacity:0;visibility:hidden;transition:opacity .35s ease,visibility .35s;z-index:1090}
+  .nav-scrim.show{opacity:1;visibility:visible}
+  body.menu-open{overflow:hidden}
 
   .burger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:8px;z-index:1200}
   .burger span{width:26px;height:2px;background:var(--cream);transition:.3s;display:block}
@@ -375,11 +382,18 @@
     .portrait{max-width:380px}
     .prog-grid,.quotes{grid-template-columns:1fr}
     .band-bg{background-attachment:scroll}
-    .nav-links{position:fixed;inset:0 0 0 auto;width:min(80vw,330px);flex-direction:column;justify-content:center;
-      gap:1.8rem;background:rgba(8,7,6,.98);backdrop-filter:blur(18px);transform:translateX(100%);
-      transition:transform .4s ease;padding:2rem;z-index:1100}
+    .nav-links{position:fixed;inset:0 0 0 auto;width:min(84vw,340px);flex-direction:column;justify-content:flex-start;
+      align-items:stretch;gap:.4rem;background:rgba(8,7,6,.985);backdrop-filter:blur(18px);transform:translateX(100%);
+      transition:transform .4s cubic-bezier(.4,0,.2,1);padding:6rem 1.8rem 2.4rem;z-index:1100;
+      border-left:1px solid var(--line);box-shadow:-30px 0 60px -20px rgba(0,0,0,.6)}
     .nav-links.open{transform:none}
-    .nav-links .btn{width:100%;justify-content:center}
+    .nav-links li{width:100%}
+    .nav-links a{color:var(--cream);font-size:1.05rem;letter-spacing:.16em;padding:.95rem .4rem;
+      display:block;border-bottom:1px solid var(--line-soft)}
+    .nav-links a::after{display:none}
+    .nav-links a:active{color:var(--bronze-lt)}
+    .nav-links li:last-child{margin-top:1.2rem;border:none}
+    .nav-links .btn{width:100%;justify-content:center;border-bottom:none;color:#1a1206;font-size:.82rem;padding:1.05rem}
     .burger{display:flex}
     .burger.x span:nth-child(1){transform:translateY(7px) rotate(45deg)}
     .burger.x span:nth-child(2){opacity:0}
@@ -426,6 +440,7 @@
     </ul>
     <button class="burger" id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
   </div>
+  <div class="nav-scrim" id="navScrim"></div>
 </header>
 
 <!-- ===== HERO ===== -->
@@ -793,9 +808,13 @@
   addEventListener('scroll',function(){hdr.classList.toggle('scrolled',scrollY>40);},{passive:true});
 
   // mobile menu
-  var burger=document.getElementById('burger'),menu=document.getElementById('menu');
-  burger.addEventListener('click',function(){menu.classList.toggle('open');burger.classList.toggle('x');});
-  menu.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){menu.classList.remove('open');burger.classList.remove('x');});});
+  var burger=document.getElementById('burger'),menu=document.getElementById('menu'),scrim=document.getElementById('navScrim');
+  function closeMenu(){menu.classList.remove('open');burger.classList.remove('x');scrim.classList.remove('show');document.body.classList.remove('menu-open');}
+  function openMenu(){menu.classList.add('open');burger.classList.add('x');scrim.classList.add('show');document.body.classList.add('menu-open');}
+  burger.addEventListener('click',function(){menu.classList.contains('open')?closeMenu():openMenu();});
+  scrim.addEventListener('click',closeMenu);
+  menu.querySelectorAll('a').forEach(function(a){a.addEventListener('click',closeMenu);});
+  addEventListener('keydown',function(e){if(e.key==='Escape')closeMenu();});
 
   // reveal — always ends visible
   (function(){
