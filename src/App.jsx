@@ -712,7 +712,7 @@ export default function App() {
 
       <main style={{ padding: "26px 18px 60px" }}>
         {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} />}
-        {view === "scripturegym" && <ScriptureGymApp user={user} />}
+        {view === "scripturegym" && <ScriptureGymApp user={user} role={profile?.role} />}
         {view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
         {view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
         {view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}

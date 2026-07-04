@@ -279,6 +279,69 @@ export async function setNickname(userId, nickname) {
 }
 
 /* ---------------------------------------------------------------------------
+   COHORTS  (leader-managed groups; a guy can belong to more than one)
+   ------------------------------------------------------------------------- */
+
+export async function fetchMyCohorts(userId) {
+  const { data, error } = await supabase
+    .from("cohorts")
+    .select("id, name, created_by, created_at")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false });
+  if (error) return { data: null, error };
+
+  const ids = (data || []).map(c => c.id);
+  if (ids.length === 0) return { data: [], error: null };
+
+  const { data: memberRows } = await supabase
+    .from("cohort_members")
+    .select("cohort_id")
+    .in("cohort_id", ids);
+  const counts = {};
+  (memberRows || []).forEach(m => { counts[m.cohort_id] = (counts[m.cohort_id] || 0) + 1; });
+
+  return { data: data.map(c => ({ ...c, memberCount: counts[c.id] || 0 })), error: null };
+}
+
+export async function createCohort(userId, name) {
+  return supabase.from("cohorts").insert({ name, created_by: userId }).select().single();
+}
+
+export async function deleteCohort(cohortId) {
+  return supabase.from("cohorts").delete().eq("id", cohortId);
+}
+
+export async function fetchCohortMembers(cohortId) {
+  const { data: memberRows, error } = await supabase
+    .from("cohort_members")
+    .select("user_id, joined_at")
+    .eq("cohort_id", cohortId);
+  if (error) return { data: null, error };
+  if (!memberRows || memberRows.length === 0) return { data: [], error: null };
+
+  const ids = memberRows.map(m => m.user_id);
+  const { data: people, error: pErr } = await supabase
+    .from("member_directory")
+    .select("id, display_name")
+    .in("id", ids);
+  if (pErr) return { data: null, error: pErr };
+
+  const nameById = Object.fromEntries((people || []).map(p => [p.id, p.display_name]));
+  return {
+    data: memberRows.map(m => ({ userId: m.user_id, displayName: nameById[m.user_id] || "A brother", joinedAt: m.joined_at })),
+    error: null,
+  };
+}
+
+export async function addCohortMember(cohortId, userId) {
+  return supabase.from("cohort_members").insert({ cohort_id: cohortId, user_id: userId });
+}
+
+export async function removeCohortMember(cohortId, userId) {
+  return supabase.from("cohort_members").delete().eq("cohort_id", cohortId).eq("user_id", userId);
+}
+
+/* ---------------------------------------------------------------------------
    MEMBER DIRECTORY  (name-only lookup, for picking a workout partner)
    ------------------------------------------------------------------------- */
 

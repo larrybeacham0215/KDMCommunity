@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
   fetchMuscleGroups, fetchGroupVerses, fetchStats,
   setVerseStatus, incrementQuizCount, logWorkoutSession, fetchMemberDirectory, fetchSessionHistory,
   fetchContent, createMuscleGroup, createVerse, setMergedView,
+  fetchMyCohorts, createCohort, deleteCohort, fetchCohortMembers, addCohortMember, removeCohortMember,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -537,7 +538,140 @@ function ProgressScreen({ user, onBack }) {
     </Wrap>
   );
 }
-export function ScriptureGymApp({ user }) {
+function CohortDetail({ cohort, onBack }) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [directory, setDirectory] = useState([]);
+  const [addingId, setAddingId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await fetchCohortMembers(cohort.id);
+    if (error) setErr(error.message); else { setMembers(data); setErr(null); }
+    setLoading(false);
+  }, [cohort.id]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetchMemberDirectory().then(({ data }) => { if (data) setDirectory(data); }); }, []);
+
+  const addMember = async () => {
+    if (!addingId) return;
+    setSaving(true);
+    await addCohortMember(cohort.id, addingId);
+    setSaving(false);
+    setAddingId("");
+    load();
+  };
+
+  const removeMember = async (userId) => {
+    await removeCohortMember(cohort.id, userId);
+    load();
+  };
+
+  const availableToAdd = directory.filter(d => !members.some(m => m.userId === d.id));
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title={cohort.name} sub={`${members.length} member${members.length === 1 ? "" : "s"}`}
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back to Cohorts</Btn>} />
+
+      <Card pad={16} style={{ marginBottom: 18, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <select value={addingId} onChange={e => setAddingId(e.target.value)} style={{ ...inputBase, flex: "1 1 200px" }}>
+          <option value="">Add a member…</option>
+          {availableToAdd.map(d => <option key={d.id} value={d.id}>{d.display_name}</option>)}
+        </select>
+        <Btn onClick={addMember} disabled={saving || !addingId}>{saving ? "Adding…" : "+ Add"}</Btn>
+      </Card>
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : members.length === 0 ? <Empty>No members yet — add one above.</Empty> : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {members.map(m => (
+            <Card key={m.userId} pad={14} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontFamily: T.body, fontSize: 13.5, color: T.cream }}>{m.displayName}</span>
+              <button onClick={() => removeMember(m.userId)} style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer" }}><Trash2 size={14} /></button>
+            </Card>
+          ))}
+        </div>
+      )}
+    </Wrap>
+  );
+}
+
+function CohortsScreen({ user, onBack }) {
+  const [cohorts, setCohorts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await fetchMyCohorts(user.id);
+    if (error) setErr(error.message); else { setCohorts(data); setErr(null); }
+    setLoading(false);
+  }, [user.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const addCohort = async () => {
+    if (!newName.trim()) return;
+    setSaving(true);
+    const { error } = await createCohort(user.id, newName);
+    setSaving(false);
+    if (!error) { setNewName(""); load(); }
+  };
+
+  const removeCohort = async (c) => {
+    if (!window.confirm(`Delete "${c.name}"? This removes all its members too.`)) return;
+    await deleteCohort(c.id);
+    load();
+  };
+
+  if (selected) {
+    return <CohortDetail cohort={selected} onBack={() => { setSelected(null); load(); }} />;
+  }
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title="My Cohorts" sub="Groups you lead — guys can belong to more than one."
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      <Card pad={16} style={{ marginBottom: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input style={{ ...inputBase, flex: "1 1 200px" }} value={newName}
+          onChange={e => setNewName(e.target.value)} placeholder="e.g. Tuesday Night Group" />
+        <Btn onClick={addCohort} disabled={saving}>{saving ? "Adding…" : "+ New Cohort"}</Btn>
+      </Card>
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : cohorts.length === 0 ? <Empty>You haven't created a cohort yet.</Empty> : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {cohorts.map(c => (
+            <Card key={c.id} pad={16} onClick={() => setSelected(c)}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+              <div>
+                <div style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, fontWeight: 600 }}>{c.name}</div>
+                <div style={{ fontFamily: T.body, fontSize: 12, color: T.muted2, marginTop: 2 }}>
+                  {c.memberCount} member{c.memberCount === 1 ? "" : "s"}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button onClick={(e) => { e.stopPropagation(); removeCohort(c); }}
+                  style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer" }}><Trash2 size={15} /></button>
+                <ChevronRight size={16} color={T.muted2} />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </Wrap>
+  );
+}
+
+export function ScriptureGymApp({ user, role }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [groups, setGroups] = useState({ official: [], personal: [] });
@@ -548,6 +682,8 @@ export function ScriptureGymApp({ user }) {
   const [showTrainingWheels, setShowTrainingWheels] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
+  const [showCohorts, setShowCohorts] = useState(false);
+  const isLeader = role === "owner" || role === "admin" || role === "cohort_leader";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -583,6 +719,10 @@ export function ScriptureGymApp({ user }) {
     return <TrainingWheelsPage onBack={() => setShowTrainingWheels(false)} />;
   }
 
+  if (showCohorts) {
+    return <CohortsScreen user={user} onBack={() => setShowCohorts(false)} />;
+  }
+
   if (selectedGroup && workoutVerses) {
     return (
       <WorkoutSession
@@ -611,7 +751,8 @@ export function ScriptureGymApp({ user }) {
       <Head kicker="The Gym" title="Scripture Gym"
         sub="Train the Word like iron. A place to build, drill, and strengthen scripture memory for the men."
         right={
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
             <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
             <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>
             <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
