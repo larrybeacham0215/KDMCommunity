@@ -267,3 +267,16 @@ export async function setNickname(userId, nickname) {
     .from("scripture_gym_stats")
     .upsert({ user_id: userId, nickname, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
 }
+
+/* ---------------------------------------------------------------------------
+   MEMBER DIRECTORY  (name-only lookup, for picking a workout partner)
+   ------------------------------------------------------------------------- */
+
+export async function fetchMemberDirectory(excludeUserId) {
+  const { data, error } = await supabase
+    .from("member_directory")
+    .select("id, display_name")
+    .order("display_name", { ascending: true });
+  if (error) return { data: null, error };
+  return { data: (data || []).filter(m => m.id !== excludeUserId), error: null };
+}

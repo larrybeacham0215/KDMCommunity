@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check } from "lucide-react";
-import { T, Eyebrow, Card, Btn } from "./ui";
-import { fetchMuscleGroups, fetchGroupVerses, fetchStats } from "./scriptureGymData";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon } from "lucide-react";
+import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
+import {
+  fetchMuscleGroups, fetchGroupVerses, fetchStats,
+  setVerseStatus, incrementQuizCount, logWorkoutSession, fetchMemberDirectory,
+} from "./scriptureGymData";
 
 /* ===========================================================================
    Local layout helpers — mirrors admin.jsx's Wrap/Head/Loading/Empty/ErrBox
@@ -169,24 +172,138 @@ function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
   );
 }
 
-// Temporary stand-in for the real Workout Session screen (Step 6).
-function WorkoutStub({ verses, onBack }) {
+function maskText(text) {
+  return text.split(" ").map((w, i) => {
+    if (w.length <= 2 || i % 4 === 0) return w; // leave short words + anchor points visible
+    return w.replace(/[A-Za-z]/g, "_");
+  }).join(" ");
+}
+
+function WorkoutVerseCard({ verse, userId, onStatusChange }) {
+  const [status, setStatus] = useState(verse.status);
+  const [quizzing, setQuizzing] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const mark = async (newStatus) => {
+    setBusy(true);
+    const { error } = await setVerseStatus(userId, verse.id, newStatus);
+    setBusy(false);
+    if (!error) { setStatus(newStatus); onStatusChange(verse.id, newStatus); }
+  };
+
+  const toggleQuiz = async () => {
+    const next = !quizzing;
+    setQuizzing(next);
+    if (next) await incrementQuizCount(userId, verse.id);
+  };
+
+  return (
+    <Card pad={20} style={{ marginBottom: 14, border: `1px solid ${T.bronze}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <span style={{ fontFamily: T.display, fontSize: 17, color: T.bronzeLt, letterSpacing: ".01em", textTransform: "uppercase" }}>
+          {verse.reference}
+        </span>
+        <StatusPill status={status} />
+      </div>
+      <p style={{
+        fontFamily: T.serif, fontStyle: "italic", fontSize: 15, color: quizzing ? T.muted2 : T.cream,
+        lineHeight: 1.6, margin: "0 0 14px", borderLeft: `2px solid ${T.line}`, paddingLeft: 14,
+      }}>
+        "{quizzing ? maskText(verse.verse_text) : verse.verse_text}"
+      </p>
+      <div style={{ marginBottom: 12 }}>
+        <Btn kind="ghost" onClick={toggleQuiz}>
+          {quizzing ? <><Eye size={13} /> Reveal</> : <><EyeOff size={13} /> Quiz Me</>}
+        </Btn>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <Btn kind={status === "learning" ? "solid" : "ghost"} disabled={busy} onClick={() => mark("learning")} full>
+            Still Learning
+          </Btn>
+        </div>
+        <div style={{ flex: 1 }}>
+          <Btn kind={status === "memorized" ? "solid" : "ghost"} disabled={busy} onClick={() => mark("memorized")} full>
+            <Check size={13} /> Mark Memorized
+          </Btn>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function WorkoutSession({ group, verses, user, onBack, onFinish }) {
+  const [sessionType, setSessionType] = useState("solo");
+  const [partnerId, setPartnerId] = useState("");
+  const [members, setMembers] = useState([]);
+  const [verseStates, setVerseStates] = useState(() => Object.fromEntries(verses.map(v => [v.id, v.status])));
+  const [notes, setNotes] = useState("");
+  const [finishing, setFinishing] = useState(false);
+
+  useEffect(() => {
+    if (sessionType === "paired" && members.length === 0) {
+      fetchMemberDirectory(user.id).then(({ data }) => { if (data) setMembers(data); });
+    }
+  }, [sessionType, members.length, user.id]);
+
+  const handleStatusChange = (verseId, status) => setVerseStates(s => ({ ...s, [verseId]: status }));
+
+  const finish = async () => {
+    setFinishing(true);
+    await logWorkoutSession({
+      userId: user.id,
+      muscleGroupId: group.id,
+      verseIds: verses.map(v => v.id),
+      sessionType,
+      partnerUserId: sessionType === "paired" && partnerId ? partnerId : null,
+      notes,
+    });
+    setFinishing(false);
+    onFinish();
+  };
+
+  const memorizedCount = Object.values(verseStates).filter(s => s === "memorized").length;
+
   return (
     <Wrap>
-      <Head kicker="Scripture Gym" title="Workout Session"
-        sub={`${verses.length} verse${verses.length === 1 ? "" : "s"} selected`}
+      <Head kicker="Scripture Gym" title="Workout Session" sub={group.name}
         right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
-      <Card pad={30} style={{ textAlign: "center" }}>
-        <Dumbbell size={30} color={T.bronzeLt} style={{ marginBottom: 12 }} />
-        <div style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".16em", textTransform: "uppercase", color: T.muted }}>
-          Coming in Step 6
+
+      <Card pad={18} style={{ marginBottom: 18 }}>
+        <Field label="Training With" />
+        <div style={{ display: "flex", gap: 10, marginBottom: sessionType === "paired" ? 14 : 0 }}>
+          <div style={{ flex: 1 }}>
+            <Btn kind={sessionType === "solo" ? "solid" : "ghost"} full onClick={() => setSessionType("solo")}>
+              <UserIcon size={14} /> Solo
+            </Btn>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Btn kind={sessionType === "paired" ? "solid" : "ghost"} full onClick={() => setSessionType("paired")}>
+              <Users size={14} /> Paired
+            </Btn>
+          </div>
         </div>
-        <div style={{ marginTop: 16, display: "grid", gap: 8, textAlign: "left", maxWidth: 360, marginInline: "auto" }}>
-          {verses.map(v => (
-            <div key={v.id} style={{ fontFamily: T.body, fontSize: 13, color: T.cream }}>• {v.reference}</div>
-          ))}
-        </div>
+        {sessionType === "paired" && (
+          <select value={partnerId} onChange={e => setPartnerId(e.target.value)} style={inputBase}>
+            <option value="">Select a partner (optional)</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.display_name}</option>)}
+          </select>
+        )}
       </Card>
+
+      {verses.map(v => (
+        <WorkoutVerseCard key={v.id} verse={v} userId={user.id} onStatusChange={handleStatusChange} />
+      ))}
+
+      <Card pad={18} style={{ marginTop: 4, marginBottom: 18 }}>
+        <Field label="Notes (optional)" />
+        <textarea rows={3} style={{ ...inputBase, resize: "vertical" }} value={notes}
+          onChange={e => setNotes(e.target.value)} placeholder="How did it go?" />
+      </Card>
+
+      <Btn full onClick={finish} disabled={finishing}>
+        <Flame size={14} /> {finishing ? "Saving…" : `Finish Workout${memorizedCount ? ` — ${memorizedCount} memorized` : ""}`}
+      </Btn>
     </Wrap>
   );
 }
@@ -221,7 +338,15 @@ export function ScriptureGymApp({ user }) {
   useEffect(() => { load(); }, [load]);
 
   if (selectedGroup && workoutVerses) {
-    return <WorkoutStub verses={workoutVerses} onBack={() => setWorkoutVerses(null)} />;
+    return (
+      <WorkoutSession
+        group={selectedGroup}
+        verses={workoutVerses}
+        user={user}
+        onBack={() => setWorkoutVerses(null)}
+        onFinish={() => { setWorkoutVerses(null); setSelectedGroup(null); load(); }}
+      />
+    );
   }
 
   if (selectedGroup) {
