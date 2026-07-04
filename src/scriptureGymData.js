@@ -16,7 +16,7 @@ import { supabase } from "./dataService";
 export async function fetchMuscleGroups(userId) {
   const { data: groups, error } = await supabase
     .from("muscle_groups")
-    .select("id, name, description, owner_type, display_order, created_by")
+    .select("id, name, description, owner_type, display_order, created_by, merged_view")
     .order("display_order", { ascending: true });
   if (error) return { data: null, error };
 
@@ -46,13 +46,23 @@ export async function fetchMuscleGroups(userId) {
     memorizedCount: countsByGroup[g.id]?.memorized ?? 0,
   }));
 
+  const myPersonal = enriched.filter(g => g.owner_type === "personal" && g.created_by === userId);
+
   return {
     data: {
-      official: enriched.filter(g => g.owner_type === "official"),
-      personal: enriched.filter(g => g.owner_type === "personal" && g.created_by === userId),
+      // Official groups + this user's personal groups he's chosen to merge in
+      official: [
+        ...enriched.filter(g => g.owner_type === "official"),
+        ...myPersonal.filter(g => g.merged_view),
+      ],
+      personal: myPersonal.filter(g => !g.merged_view),
     },
     error: null,
   };
+}
+
+export async function setMergedView(groupId, mergedView) {
+  return supabase.from("muscle_groups").update({ merged_view: mergedView }).eq("id", groupId);
 }
 
 export async function createMuscleGroup(userId, name, description = "") {

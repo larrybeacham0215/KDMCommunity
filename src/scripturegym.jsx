@@ -4,7 +4,7 @@ import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
   fetchMuscleGroups, fetchGroupVerses, fetchStats,
   setVerseStatus, incrementQuizCount, logWorkoutSession, fetchMemberDirectory, fetchSessionHistory,
-  fetchContent,
+  fetchContent, createMuscleGroup, createVerse, setMergedView,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -131,6 +131,11 @@ function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
   const [err, setErr] = useState(null);
   const [verses, setVerses] = useState([]);
   const [selected, setSelected] = useState(new Set());
+  const [merged, setMerged] = useState(group.merged_view || false);
+  const [mergeSaving, setMergeSaving] = useState(false);
+  const [draft, setDraft] = useState({ reference: "", verse_text: "" });
+  const [addSaving, setAddSaving] = useState(false);
+  const isPersonal = group.owner_type === "personal";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,11 +154,57 @@ function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
     });
   };
 
+  const toggleMerge = async () => {
+    const next = !merged;
+    setMergeSaving(true);
+    setMerged(next);
+    await setMergedView(group.id, next);
+    setMergeSaving(false);
+  };
+
+  const addVerse = async () => {
+    if (!draft.reference.trim() || !draft.verse_text.trim()) return;
+    setAddSaving(true);
+    const { error } = await createVerse(group.id, user.id, draft.reference, draft.verse_text);
+    setAddSaving(false);
+    if (!error) { setDraft({ reference: "", verse_text: "" }); load(); }
+  };
+
   return (
     <Wrap>
       <Head kicker="Scripture Gym" title={group.name}
         sub={group.description || "Pick the verses you want to train today."}
         right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      {isPersonal && (
+        <Card pad={16} style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, fontWeight: 600 }}>Show with Official Muscle Groups</div>
+            <div style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, marginTop: 2 }}>
+              Cosmetic only — still just yours, no one else ever sees this group.
+            </div>
+          </div>
+          <Btn kind={merged ? "solid" : "ghost"} onClick={toggleMerge} disabled={mergeSaving}>
+            {merged ? "Merged In" : "Keep Separate"}
+          </Btn>
+        </Card>
+      )}
+
+      {isPersonal && (
+        <Card pad={16} style={{ marginBottom: 18 }}>
+          <Field label="Reference" />
+          <input style={inputBase} value={draft.reference}
+            onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} placeholder="e.g. Joshua 1:9" />
+          <div style={{ marginTop: 10 }}>
+            <Field label="Verse Text" />
+            <textarea rows={2} style={{ ...inputBase, resize: "vertical" }} value={draft.verse_text}
+              onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Btn onClick={addVerse} disabled={addSaving}>{addSaving ? "Adding…" : "Add Verse"}</Btn>
+          </div>
+        </Card>
+      )}
 
       {err && <ErrBox msg={err} />}
       {loading ? <Loading /> : verses.length === 0 ? <Empty>No verses in this muscle group yet.</Empty> : (
@@ -495,6 +546,8 @@ export function ScriptureGymApp({ user }) {
   const [workoutVerses, setWorkoutVerses] = useState(null);
   const [showProgress, setShowProgress] = useState(false);
   const [showTrainingWheels, setShowTrainingWheels] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [addingGroup, setAddingGroup] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -513,6 +566,14 @@ export function ScriptureGymApp({ user }) {
   }, [user.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const addGroup = async () => {
+    if (!newGroupName.trim()) return;
+    setAddingGroup(true);
+    const { error } = await createMuscleGroup(user.id, newGroupName);
+    setAddingGroup(false);
+    if (!error) { setNewGroupName(""); load(); }
+  };
 
   if (showProgress) {
     return <ProgressScreen user={user} onBack={() => setShowProgress(false)} />;
@@ -539,7 +600,7 @@ export function ScriptureGymApp({ user }) {
       <MuscleGroupDetail
         group={selectedGroup}
         user={user}
-        onBack={() => setSelectedGroup(null)}
+        onBack={() => { setSelectedGroup(null); load(); }}
         onStartWorkout={setWorkoutVerses}
       />
     );
@@ -589,8 +650,13 @@ export function ScriptureGymApp({ user }) {
             : groups.official.map(g => <GroupRow key={g.id} group={g} onClick={setSelectedGroup} />)}
 
           <div style={{ marginTop: 22 }}>{sectionLabel("My Muscle Groups")}</div>
+          <Card pad={14} style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input style={{ ...inputBase, flex: "1 1 200px" }} value={newGroupName}
+              onChange={e => setNewGroupName(e.target.value)} placeholder="Name your own muscle group…" />
+            <Btn onClick={addGroup} disabled={addingGroup}>{addingGroup ? "Adding…" : "+ Add"}</Btn>
+          </Card>
           {groups.personal.length === 0
-            ? <Empty>You haven't built your own muscle group yet. That's coming in Step 11.</Empty>
+            ? <Empty>You haven't built your own muscle group yet — add one above.</Empty>
             : groups.personal.map(g => <GroupRow key={g.id} group={g} onClick={setSelectedGroup} />)}
         </>
       )}
