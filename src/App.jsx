@@ -3,11 +3,12 @@ import {
   Menu, X, Flame, ShieldCheck, BookOpen, CalendarCheck, Compass,
   Video, Upload, Square, Play, ChevronRight, ChevronDown, LogOut, User,
   CheckCircle2, Circle, Quote, ArrowRight, Lock, Mail, NotebookPen, Target,
-  Server
+  Server, Dumbbell
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Crest, Eyebrow, Btn, Card } from "./ui";
 import { AdminScreen, SystemsScreen, OWNER_NAV, SYSTEMS_SUB, ADMIN_TITLES } from "./admin";
+import { ScriptureGymApp } from "./scripturegym";
 
 /* ============================================================================
    KINGDOM OF DISCIPLINED MEN — Member App
@@ -110,6 +111,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner }) {
   const [sysOpen, setSysOpen] = useState(false);
   const items = [
     { id: "dashboard", label: "The Forge", icon: Flame },
+    { id: "scripturegym", label: "Scripture Gym", icon: Dumbbell },
     { id: "p30", label: "30-Day Intensive", icon: ShieldCheck },
     { id: "p90", label: "90-Day Curriculum", icon: BookOpen },
     { id: "checkin", label: "Daily Check-In", icon: CalendarCheck },
@@ -640,7 +642,7 @@ export default function App() {
 
   const streak = profile?.streak ?? 0;
   const user = session?.user
-    ? { email: session.user.email, name: profile?.full_name || session.user.email.split("@")[0] }
+    ? { id: session.user.id, email: session.user.email, name: profile?.full_name || session.user.email.split("@")[0] }
     : null;
 
   // auth session bootstrap + listener
@@ -685,7 +687,7 @@ export default function App() {
   if (!user) return <Login />;
 
   const isOwner = profile?.role === "owner";
-  const titles = { dashboard: "The Forge", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", ...ADMIN_TITLES };
+  const titles = { dashboard: "The Forge", scripturegym: "Scripture Gym", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", ...ADMIN_TITLES };
 
   return (
     <div style={{ minHeight: "100vh", background: T.obsidian, color: T.cream, fontFamily: T.body }}>
@@ -710,6 +712,7 @@ export default function App() {
 
       <main style={{ padding: "26px 18px 60px" }}>
         {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} />}
+        {view === "scripturegym" && <ScriptureGymApp user={user} />}
         {view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
         {view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
         {view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}
