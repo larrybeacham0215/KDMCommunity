@@ -104,7 +104,10 @@ function AdminUsers({ profile }) {
   const { rows, loading, err, reload, setRows } = useTable("profiles", "created_at");
   const [busy, setBusy] = useState(null);
 
+  const ROLE_LABELS = { owner: "Owner", admin: "Admin", cohort_leader: "Cohort Leader", member: "Member" };
+
   const setRole = async (u, role) => {
+    if (role === "owner" && !window.confirm(`Make ${u.full_name || u.email} a Super Admin (Owner)? This gives full control of the app, including the curriculum and every member's data.`)) return;
     setBusy(u.id);
     const { error } = await supabase.from("profiles").update({ role }).eq("id", u.id);
     if (!error) {
@@ -117,7 +120,7 @@ function AdminUsers({ profile }) {
   return (
     <Wrap>
       <Head kicker="Command" title="Members & Roles"
-        sub="Everyone in the Kingdom. Promote a man to owner or hold him as a member."
+        sub="Everyone in the Kingdom. Super Admin owns the curriculum; Admins manage people & cohorts; Cohort Leaders shepherd their own group."
         right={<Btn kind="ghost" onClick={reload}><RefreshCw size={14} /> Refresh</Btn>} />
       {err && <ErrBox msg={err} />}
       {loading ? <Loading /> : rows.length === 0 ? <Empty>No members yet.</Empty> : (
@@ -142,12 +145,19 @@ function AdminUsers({ profile }) {
                 color: u.role === "owner" ? "#1a1206" : T.bronzeLt,
                 background: u.role === "owner" ? T.gold : "transparent",
                 border: `1px solid ${u.role === "owner" ? "transparent" : T.line}`,
-              }}>{u.role || "member"}</span>
+              }}>{ROLE_LABELS[u.role] || "Member"}</span>
               {u.id !== profile?.id && (
-                <Btn kind="ghost" disabled={busy === u.id}
-                  onClick={() => setRole(u, u.role === "owner" ? "member" : "owner")}>
-                  {busy === u.id ? "…" : u.role === "owner" ? "Make member" : "Make owner"}
-                </Btn>
+                <select
+                  value={u.role || "member"}
+                  disabled={busy === u.id}
+                  onChange={(e) => setRole(u, e.target.value)}
+                  style={{ ...inputBase, width: "auto", padding: "8px 10px", fontSize: 12.5 }}
+                >
+                  <option value="member">Member</option>
+                  <option value="cohort_leader">Cohort Leader</option>
+                  <option value="admin">Admin</option>
+                  <option value="owner">Owner</option>
+                </select>
               )}
             </Card>
           ))}
