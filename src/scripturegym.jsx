@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle } from "lucide-react";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check } from "lucide-react";
 import { T, Eyebrow, Card, Btn } from "./ui";
-import { fetchMuscleGroups, fetchStats } from "./scriptureGymData";
+import { fetchMuscleGroups, fetchGroupVerses, fetchStats } from "./scriptureGymData";
 
 /* ===========================================================================
    Local layout helpers — mirrors admin.jsx's Wrap/Head/Loading/Empty/ErrBox
@@ -73,21 +73,119 @@ function GroupRow({ group, onClick }) {
   );
 }
 
-// Temporary stand-in for the real Muscle Group Detail screen (Step 5).
-function GroupDetailStub({ group, onBack }) {
+function StatusPill({ status }) {
+  const cfg = {
+    memorized: { label: "Memorized", bg: "rgba(91,138,91,.18)", color: "#8fc48f", border: "rgba(91,138,91,.4)" },
+    learning: { label: "Learning", bg: "rgba(200,134,46,.15)", color: T.bronzeLt, border: T.line },
+    not_started: { label: "Not Started", bg: "rgba(255,255,255,.04)", color: T.muted2, border: T.lineSoft },
+  }[status] || { label: status, bg: "transparent", color: T.muted2, border: T.lineSoft };
+  return (
+    <span style={{
+      fontFamily: T.reg, fontSize: 9.5, textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700,
+      padding: "3px 9px", borderRadius: 100, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+      whiteSpace: "nowrap",
+    }}>{cfg.label}</span>
+  );
+}
+
+function VerseRow({ verse, selected, onToggle }) {
+  const lastTrained = verse.lastPracticedAt
+    ? `Last trained ${new Date(verse.lastPracticedAt).toLocaleDateString()}`
+    : "Never trained";
+  return (
+    <Card pad={16} onClick={() => onToggle(verse.id)} style={{
+      cursor: "pointer", marginBottom: 10,
+      border: `1px solid ${selected ? T.bronze : T.line}`,
+      background: selected ? `linear-gradient(180deg, rgba(200,134,46,.10), ${T.obsidian2})` : undefined,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: T.body, fontSize: 14, color: T.cream, fontWeight: 700 }}>{verse.reference}</span>
+            <StatusPill status={verse.status} />
+          </div>
+          <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 13.5, color: T.muted, lineHeight: 1.5, margin: "8px 0 6px" }}>
+            "{verse.verse_text}"
+          </p>
+          <div style={{ fontFamily: T.body, fontSize: 11, color: T.muted2 }}>{lastTrained}</div>
+        </div>
+        <div style={{
+          width: 22, height: 22, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+          border: `2px solid ${selected ? T.bronze : T.line}`,
+          background: selected ? T.gold : "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {selected && <Check size={13} color="#1a1206" strokeWidth={3} />}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [verses, setVerses] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await fetchGroupVerses(group.id, user.id);
+    if (error) setErr(error.message); else { setVerses(data); setErr(null); }
+    setLoading(false);
+  }, [group.id, user.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = (id) => {
+    setSelected(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <Wrap>
-      <Head kicker="Scripture Gym" title={group.name} sub="Muscle Group Detail"
+      <Head kicker="Scripture Gym" title={group.name}
+        sub={group.description || "Pick the verses you want to train today."}
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : verses.length === 0 ? <Empty>No verses in this muscle group yet.</Empty> : (
+        <>
+          {verses.map(v => (
+            <VerseRow key={v.id} verse={v} selected={selected.has(v.id)} onToggle={toggle} />
+          ))}
+          <div style={{ marginTop: 16 }}>
+            <Btn full disabled={selected.size === 0}
+              onClick={() => onStartWorkout(verses.filter(v => selected.has(v.id)))}>
+              <Dumbbell size={14} /> Start Workout{selected.size > 0 ? ` (${selected.size} selected)` : ""}
+            </Btn>
+          </div>
+        </>
+      )}
+    </Wrap>
+  );
+}
+
+// Temporary stand-in for the real Workout Session screen (Step 6).
+function WorkoutStub({ verses, onBack }) {
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title="Workout Session"
+        sub={`${verses.length} verse${verses.length === 1 ? "" : "s"} selected`}
         right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
       <Card pad={30} style={{ textAlign: "center" }}>
         <Dumbbell size={30} color={T.bronzeLt} style={{ marginBottom: 12 }} />
         <div style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".16em", textTransform: "uppercase", color: T.muted }}>
-          Coming in Step 5
+          Coming in Step 6
         </div>
-        <p style={{ fontFamily: T.body, color: T.muted2, fontSize: 13.5, marginTop: 10, maxWidth: 380, marginInline: "auto", lineHeight: 1.55 }}>
-          This is where the verses in "{group.name}" will show up with their status —
-          Not Started, Learning, or Memorized — and where you'll pick which ones to train today.
-        </p>
+        <div style={{ marginTop: 16, display: "grid", gap: 8, textAlign: "left", maxWidth: 360, marginInline: "auto" }}>
+          {verses.map(v => (
+            <div key={v.id} style={{ fontFamily: T.body, fontSize: 13, color: T.cream }}>• {v.reference}</div>
+          ))}
+        </div>
       </Card>
     </Wrap>
   );
@@ -102,6 +200,7 @@ export function ScriptureGymApp({ user }) {
   const [groups, setGroups] = useState({ official: [], personal: [] });
   const [stats, setStats] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
+  const [workoutVerses, setWorkoutVerses] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,8 +220,19 @@ export function ScriptureGymApp({ user }) {
 
   useEffect(() => { load(); }, [load]);
 
+  if (selectedGroup && workoutVerses) {
+    return <WorkoutStub verses={workoutVerses} onBack={() => setWorkoutVerses(null)} />;
+  }
+
   if (selectedGroup) {
-    return <GroupDetailStub group={selectedGroup} onBack={() => setSelectedGroup(null)} />;
+    return (
+      <MuscleGroupDetail
+        group={selectedGroup}
+        user={user}
+        onBack={() => setSelectedGroup(null)}
+        onStartWorkout={setWorkoutVerses}
+      />
+    );
   }
 
   return (
