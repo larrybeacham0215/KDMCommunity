@@ -9,6 +9,7 @@ import {
   fetchBadges, MILESTONE_THRESHOLDS, STREAK_THRESHOLDS,
   fetchLeaderboard, setNickname,
   postToCohort, fetchCohortsForMember, fetchCohortFeed, toggleCheer,
+  computeNudge,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -990,6 +991,24 @@ export function ScriptureGymApp({ user, role }) {
         } />
 
       {err && <ErrBox msg={err} />}
+
+      {!loading && computeNudge(stats) && (() => {
+        const nudge = computeNudge(stats);
+        return (
+          <Card pad={16} style={{
+            marginBottom: 20,
+            border: `1px solid ${nudge.type === "streak_protect" ? T.emberHot : T.bronze}`,
+            background: nudge.type === "streak_protect"
+              ? "linear-gradient(90deg, rgba(212,80,43,.12), transparent)"
+              : "linear-gradient(90deg, rgba(200,134,46,.10), transparent)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Flame size={18} color={nudge.type === "streak_protect" ? T.emberHot : T.bronzeLt} />
+              <span style={{ fontFamily: T.body, fontSize: 13.5, color: T.cream }}>{nudge.message}</span>
+            </div>
+          </Card>
+        );
+      })()}
 
       {loading ? <Loading /> : (
         <>

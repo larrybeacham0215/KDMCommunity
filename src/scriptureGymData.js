@@ -557,3 +557,43 @@ export async function fetchContent(key) {
     .maybeSingle();
   return { data, error };
 }
+
+/* ---------------------------------------------------------------------------
+   NOTIFICATION CADENCE  (in-app banner today; real push needs Step 19's PWA
+   wrapper AND a scheduling mechanism this project doesn't have yet — see
+   the build note for that gap. This function is pure and side-effect free,
+   so it's ready to feed a real push scheduler once one exists.)
+   ------------------------------------------------------------------------- */
+
+export function computeNudge(stats) {
+  if (!stats) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const last = stats.last_session_date;
+  const streak = stats.current_streak || 0;
+
+  // Already trained today — nothing to nudge about.
+  if (last === today) return null;
+
+  // Streak protection takes priority over re-engagement.
+  if (streak >= 2) {
+    return {
+      type: "streak_protect",
+      message: `Don't lose your ${streak}-day streak — got 5 minutes for a verse today?`,
+    };
+  }
+
+  if (!last) return null; // never trained yet; that's a fresh start, not a lapse
+
+  const gapDays = Math.round((new Date(today) - new Date(last)) / 86400000);
+  if (gapDays >= 3 && gapDays < 7) {
+    return { type: "reengage", message: "It's been a few days. Your muscle groups are ready when you are." };
+  }
+  if (gapDays >= 7 && gapDays < 14) {
+    return { type: "reengage", message: `You've memorized ${stats.total_memorized || 0} verse${stats.total_memorized === 1 ? "" : "s"} so far — don't stop now.` };
+  }
+  if (gapDays >= 14 && gapDays <= 20) {
+    return { type: "reengage_final", message: "It's been two weeks. Come back whenever you're ready — no pressure." };
+  }
+  // Beyond ~20 days: stop nudging entirely, per the original cadence design.
+  return null;
+}
