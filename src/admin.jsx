@@ -3,6 +3,7 @@ import {
   Users, Brain, NotebookPen, Bot, Cpu, ScrollText, Plug, Workflow, Webhook,
   KeyRound, Activity, LayoutGrid, Plus, Trash2, Save, RefreshCw, Power,
   Send, Shield, Sparkles, ChevronRight, X, AlertTriangle, Circle, CheckCircle2,
+  Dumbbell,
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Eyebrow, Btn, Card, inputBase, Field } from "./ui";
@@ -18,6 +19,7 @@ export const OWNER_NAV = [
   { id: "gideon", label: "Gideon AI", icon: Bot },
   { id: "admin_robots", label: "Robots", icon: Cpu },
   { id: "admin_constitution", label: "AI Constitution", icon: ScrollText },
+  { id: "admin_scripture_gym", label: "Scripture Gym", icon: Dumbbell },
 ];
 
 export const SYSTEMS_SUB = [
@@ -32,6 +34,7 @@ export const SYSTEMS_SUB = [
 export const ADMIN_TITLES = {
   admin_users: "Members & Roles", admin_memories: "Memories", admin_notepad: "Notepad",
   gideon: "Gideon AI", admin_robots: "Robots", admin_constitution: "AI Constitution",
+  admin_scripture_gym: "Scripture Gym",
   systems: "Systems", sys_overview: "Systems · Overview", sys_integrations: "Systems · Integrations",
   sys_automations: "Systems · Automations", sys_webhooks: "Systems · Webhooks",
   sys_secrets: "Systems · Secrets & Keys", sys_log: "Systems · Update Log",
@@ -430,6 +433,25 @@ function Constitution() {
 }
 
 /* ===========================================================================
+   SCRIPTURE GYM  (placeholder — owner-only; wire up later)
+   ========================================================================= */
+function ScriptureGym() {
+  return (
+    <PlaceholderModule
+      icon={Dumbbell}
+      title="Scripture Gym"
+      blurb="Train the Word like iron. A place to build, drill, and strengthen scripture memory for the men."
+      ideas={[
+        "Memory verses — add, organize, and review",
+        "Daily / weekly rep sets",
+        "Assign passages to members or groups",
+        "Track memorization streaks",
+      ]}
+    />
+  );
+}
+
+/* ===========================================================================
    ADMIN ROUTER
    ========================================================================= */
 export function AdminScreen({ view, profile }) {
@@ -439,6 +461,7 @@ export function AdminScreen({ view, profile }) {
   if (view === "gideon") return <Gideon />;
   if (view === "admin_robots") return <Robots profile={profile} />;
   if (view === "admin_constitution") return <Constitution />;
+  if (view === "admin_scripture_gym") return <ScriptureGym />;
   return null;
 }
 
