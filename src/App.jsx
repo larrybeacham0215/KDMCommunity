@@ -639,6 +639,12 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [checkins, setCheckins] = useState([]);
   const [progress] = useState({ p30: 12, p90: 27 });
+  const [showInstallBanner, setShowInstallBanner] = useState(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone === true
+      || window.matchMedia("(display-mode: standalone)").matches;
+    return isIOS && !isStandalone;
+  });
 
   const streak = profile?.streak ?? 0;
   const user = session?.user
@@ -691,6 +697,21 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: T.obsidian, color: T.cream, fontFamily: T.body }}>
+      {showInstallBanner && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          padding: "10px 16px", background: "rgba(200,134,46,.12)", borderBottom: `1px solid ${T.line}`,
+        }}>
+          <span style={{ fontFamily: T.body, fontSize: 12.5, color: T.cream }}>
+            Add this to your Home Screen for the best experience — tap <b>Share</b>, then <b>Add to Home Screen</b>.
+          </span>
+          <button onClick={() => setShowInstallBanner(false)}
+            style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer", flexShrink: 0 }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       <SideMenu open={menu} onClose={() => setMenu(false)} go={setView} view={view} user={user}
         onLogout={logout} isOwner={isOwner} />
 
