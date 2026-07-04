@@ -319,3 +319,16 @@ export async function fetchSessionHistory(userId, limit = 20) {
 
   return { data: enriched, error: null };
 }
+
+/* ---------------------------------------------------------------------------
+   STATIC CONTENT  (Training Wheels guide, etc. — editable without a deploy)
+   ------------------------------------------------------------------------- */
+
+export async function fetchContent(key) {
+  const { data, error } = await supabase
+    .from("scripture_gym_content")
+    .select("title, body, updated_at")
+    .eq("content_key", key)
+    .maybeSingle();
+  return { data, error };
+}

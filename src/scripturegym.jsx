@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp } from "lucide-react";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
   fetchMuscleGroups, fetchGroupVerses, fetchStats,
   setVerseStatus, incrementQuizCount, logWorkoutSession, fetchMemberDirectory, fetchSessionHistory,
+  fetchContent,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -232,6 +233,78 @@ function WorkoutVerseCard({ verse, userId, onStatusChange }) {
   );
 }
 
+function ContentBody({ content }) {
+  return (
+    <p style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
+      {content.body}
+    </p>
+  );
+}
+
+// Inline, collapsible — used inside an active Workout Session so opening it
+// never loses the guy's in-progress verse selections or notes.
+function TrainingWheelsInline() {
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const toggle = async () => {
+    if (!open && !content) {
+      setLoading(true);
+      const { data } = await fetchContent("training_wheels");
+      setContent(data);
+      setLoading(false);
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <Card pad={16} style={{ marginBottom: 18 }}>
+      <div onClick={toggle} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <BookOpen size={16} color={T.bronzeLt} />
+          <span style={{ fontFamily: T.body, fontSize: 13.5, color: T.cream, fontWeight: 600 }}>Training Wheels Method</span>
+          <span style={{ fontFamily: T.body, fontSize: 11, color: T.muted2 }}>(optional)</span>
+        </div>
+        {open ? <ChevronUp size={16} color={T.muted2} /> : <ChevronDown size={16} color={T.muted2} />}
+      </div>
+      {open && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.lineSoft}` }}>
+          {loading ? <Loading /> : content ? <ContentBody content={content} /> : <Empty>Guide not set up yet.</Empty>}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// Standalone full page — reachable any time from the Gym Home header.
+function TrainingWheelsPage({ onBack }) {
+  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data, error } = await fetchContent("training_wheels");
+      if (error) setErr(error.message); else setContent(data);
+      setLoading(false);
+    })();
+  }, []);
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title={content?.title || "Training Wheels Method"}
+        sub="Optional. Use it, adapt it, or make it your own."
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : content ? (
+        <Card pad={26}><ContentBody content={content} /></Card>
+      ) : <Empty>Guide not set up yet.</Empty>}
+    </Wrap>
+  );
+}
+
 function WorkoutSession({ group, verses, user, onBack, onFinish }) {
   const [sessionType, setSessionType] = useState("solo");
   const [partnerId, setPartnerId] = useState("");
@@ -268,6 +341,8 @@ function WorkoutSession({ group, verses, user, onBack, onFinish }) {
     <Wrap>
       <Head kicker="Scripture Gym" title="Workout Session" sub={group.name}
         right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      <TrainingWheelsInline />
 
       <Card pad={18} style={{ marginBottom: 18 }}>
         <Field label="Training With" />
@@ -419,6 +494,7 @@ export function ScriptureGymApp({ user }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [workoutVerses, setWorkoutVerses] = useState(null);
   const [showProgress, setShowProgress] = useState(false);
+  const [showTrainingWheels, setShowTrainingWheels] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -440,6 +516,10 @@ export function ScriptureGymApp({ user }) {
 
   if (showProgress) {
     return <ProgressScreen user={user} onBack={() => setShowProgress(false)} />;
+  }
+
+  if (showTrainingWheels) {
+    return <TrainingWheelsPage onBack={() => setShowTrainingWheels(false)} />;
   }
 
   if (selectedGroup && workoutVerses) {
@@ -471,6 +551,7 @@ export function ScriptureGymApp({ user }) {
         sub="Train the Word like iron. A place to build, drill, and strengthen scripture memory for the men."
         right={
           <div style={{ display: "flex", gap: 8 }}>
+            <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
             <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>
             <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
           </div>
