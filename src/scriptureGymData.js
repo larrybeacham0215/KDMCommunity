@@ -132,7 +132,9 @@ export async function setVerseStatus(userId, verseId, status) {
     .upsert(patch, { onConflict: "user_id,verse_id" });
   if (error) return { error };
 
-  return recalcTotalMemorized(userId);
+  const result = await recalcTotalMemorized(userId);
+  await checkAndAwardBadges(userId);
+  return result;
 }
 
 export async function incrementQuizCount(userId, verseId) {
@@ -235,6 +237,7 @@ export async function logWorkoutSession({ userId, muscleGroupId, verseIds, sessi
   if (error) return { data: null, error };
 
   await bumpStreakForSession(userId);
+  await checkAndAwardBadges(userId);
   return { data, error: null };
 }
 
@@ -339,6 +342,54 @@ export async function addCohortMember(cohortId, userId) {
 
 export async function removeCohortMember(cohortId, userId) {
   return supabase.from("cohort_members").delete().eq("cohort_id", cohortId).eq("user_id", userId);
+}
+
+/* ---------------------------------------------------------------------------
+   BADGES  (automatic milestone + streak recognition)
+   ------------------------------------------------------------------------- */
+
+export const MILESTONE_THRESHOLDS = [10, 25, 50, 100];
+export const STREAK_THRESHOLDS = [5, 10, 25, 50, 90];
+
+export async function fetchBadges(userId) {
+  const { data, error } = await supabase
+    .from("badges")
+    .select("badge_type, earned_at")
+    .eq("user_id", userId)
+    .order("earned_at", { ascending: true });
+  return { data: data || [], error };
+}
+
+// Checks current stats against the milestone/streak thresholds and awards
+// any newly-crossed badges. Safe to call after any progress-changing action —
+// already-earned badges are never re-awarded (unique constraint + ignoreDuplicates).
+export async function checkAndAwardBadges(userId) {
+  const { data: stats, error: statsErr } = await fetchStats(userId);
+  if (statsErr || !stats) return { newBadges: [], error: statsErr };
+
+  const { data: existing, error: exErr } = await supabase
+    .from("badges").select("badge_type").eq("user_id", userId);
+  if (exErr) return { newBadges: [], error: exErr };
+  const existingTypes = new Set((existing || []).map(b => b.badge_type));
+
+  const toAward = [];
+  for (const m of MILESTONE_THRESHOLDS) {
+    const type = `milestone_${m}`;
+    if ((stats.total_memorized || 0) >= m && !existingTypes.has(type)) toAward.push(type);
+  }
+  for (const s of STREAK_THRESHOLDS) {
+    const type = `streak_${s}`;
+    if ((stats.current_streak || 0) >= s && !existingTypes.has(type)) toAward.push(type);
+  }
+
+  if (toAward.length === 0) return { newBadges: [], error: null };
+
+  const rows = toAward.map(badge_type => ({ user_id: userId, badge_type }));
+  const { error } = await supabase
+    .from("badges")
+    .upsert(rows, { onConflict: "user_id,badge_type", ignoreDuplicates: true });
+
+  return { newBadges: error ? [] : toAward, error };
 }
 
 /* ---------------------------------------------------------------------------

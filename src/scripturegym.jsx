@@ -6,6 +6,7 @@ import {
   setVerseStatus, incrementQuizCount, logWorkoutSession, fetchMemberDirectory, fetchSessionHistory,
   fetchContent, createMuscleGroup, createVerse, setMergedView,
   fetchMyCohorts, createCohort, deleteCohort, fetchCohortMembers, addCohortMember, removeCohortMember,
+  fetchBadges, MILESTONE_THRESHOLDS, STREAK_THRESHOLDS,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -460,20 +461,35 @@ function SessionRow({ session }) {
   );
 }
 
+function BadgeMedal({ label, earned }) {
+  return (
+    <div style={{
+      aspectRatio: "1", borderRadius: "50%",
+      background: "radial-gradient(circle at 35% 30%, #2a2f36, #14161a 75%)",
+      border: `2px solid ${earned ? T.bronze : T.line}`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontFamily: T.display, fontSize: 13, color: earned ? T.bronzeLt : T.muted2,
+      boxShadow: earned ? "0 0 14px rgba(200,134,46,.25)" : "none",
+    }}>{label}</div>
+  );
+}
+
 function ProgressScreen({ user, onBack }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [stats, setStats] = useState(null);
   const [groups, setGroups] = useState({ official: [], personal: [] });
   const [history, setHistory] = useState([]);
+  const [badges, setBadges] = useState([]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [statsRes, groupsRes, historyRes] = await Promise.all([
+      const [statsRes, groupsRes, historyRes, badgesRes] = await Promise.all([
         fetchStats(user.id),
         fetchMuscleGroups(user.id),
         fetchSessionHistory(user.id, 20),
+        fetchBadges(user.id),
       ]);
       if (statsRes.error || groupsRes.error || historyRes.error) {
         setErr((statsRes.error || groupsRes.error || historyRes.error).message);
@@ -481,12 +497,14 @@ function ProgressScreen({ user, onBack }) {
         setStats(statsRes.data);
         setGroups(groupsRes.data);
         setHistory(historyRes.data);
+        setBadges(badgesRes.data || []);
         setErr(null);
       }
       setLoading(false);
     })();
   }, [user.id]);
 
+  const earnedTypes = new Set(badges.map(b => b.badge_type));
   const allGroups = [...groups.official, ...groups.personal];
 
   return (
@@ -517,6 +535,26 @@ function ProgressScreen({ user, onBack }) {
               <div style={{ fontFamily: T.body, fontSize: 10.5, color: T.muted, textTransform: "uppercase", letterSpacing: ".08em", marginTop: 6 }}>Longest Streak</div>
             </Card>
           </div>
+
+          {sectionLabel("Badges Earned")}
+          <Card pad={18} style={{ marginBottom: 22 }}>
+            <div style={{ fontFamily: T.body, fontSize: 11, color: T.muted2, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+              Verses Memorized
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>
+              {MILESTONE_THRESHOLDS.map(n => (
+                <BadgeMedal key={`m-${n}`} label={n} earned={earnedTypes.has(`milestone_${n}`)} />
+              ))}
+            </div>
+            <div style={{ fontFamily: T.body, fontSize: 11, color: T.muted2, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+              Day Streak
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+              {STREAK_THRESHOLDS.map(n => (
+                <BadgeMedal key={`s-${n}`} label={`${n}d`} earned={earnedTypes.has(`streak_${n}`)} />
+              ))}
+            </div>
+          </Card>
 
           {sectionLabel("By Muscle Group")}
           {allGroups.length === 0 ? <Empty>No muscle groups yet.</Empty> : allGroups.map(g => (
