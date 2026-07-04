@@ -73,11 +73,11 @@ export function Btn({ children, onClick, kind = "solid", full, type = "button", 
   );
 }
 
-export const Card = ({ children, pad = 22, style }) => (
+export const Card = ({ children, pad = 22, style, ...rest }) => (
   <div style={{
     background: `linear-gradient(180deg,${T.surface},${T.obsidian2})`,
     border: `1px solid ${T.line}`, borderRadius: 4, padding: pad, ...style,
-  }}>{children}</div>
+  }} {...rest}>{children}</div>
 );
 
 /* Small inputs reused by admin forms */
