@@ -3,7 +3,7 @@ import {
   Users, Brain, NotebookPen, Bot, Cpu, ScrollText, Plug, Workflow, Webhook,
   KeyRound, Activity, LayoutGrid, Plus, Trash2, Save, RefreshCw, Power,
   Send, Shield, Sparkles, ChevronRight, ChevronLeft, X, AlertTriangle, Circle, CheckCircle2,
-  Dumbbell,
+  Dumbbell, Pencil,
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Eyebrow, Btn, Card, inputBase, Field } from "./ui";
@@ -487,21 +487,218 @@ function Constitution() {
 }
 
 /* ===========================================================================
-   SCRIPTURE GYM  (placeholder — owner-only; wire up later)
+   SCRIPTURE GYM — CURRICULUM EDITOR (owner-only)
+   Manages the OFFICIAL muscle groups + verses every guy sees. Personal
+   groups guys build themselves live entirely outside this screen.
    ========================================================================= */
-function ScriptureGym() {
+function CurriculumEditor({ profile }) {
+  const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [newGroup, setNewGroup] = useState({ name: "", description: "" });
+  const [saving, setSaving] = useState(false);
+
+  const loadGroups = useCallback(async () => {
+    setLoading(true);
+    const { data: gs, error } = await supabase
+      .from("muscle_groups")
+      .select("id, name, description, display_order")
+      .eq("owner_type", "official")
+      .order("display_order", { ascending: true });
+    if (error) { setErr(error.message); setLoading(false); return; }
+    const { data: vs } = await supabase.from("verses").select("id, muscle_group_id");
+    const counts = {};
+    (vs || []).forEach(v => { counts[v.muscle_group_id] = (counts[v.muscle_group_id] || 0) + 1; });
+    setGroups((gs || []).map(g => ({ ...g, verseCount: counts[g.id] || 0 })));
+    setErr(null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  const addGroup = async () => {
+    if (!newGroup.name.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from("muscle_groups").insert({
+      name: newGroup.name, description: newGroup.description,
+      owner_type: "official", created_by: profile?.id, display_order: groups.length + 1,
+    });
+    setSaving(false);
+    if (!error) {
+      logUpdate(profile?.email || "owner", "Muscle group added", newGroup.name);
+      setNewGroup({ name: "", description: "" });
+      loadGroups();
+    }
+  };
+
+  const deleteGroup = async (g) => {
+    if (!window.confirm(`Delete "${g.name}" and all ${g.verseCount} of its verses? This can't be undone.`)) return;
+    await supabase.from("muscle_groups").delete().eq("id", g.id);
+    logUpdate(profile?.email || "owner", "Muscle group deleted", g.name);
+    loadGroups();
+  };
+
+  if (selectedGroup) {
+    return <VerseEditor group={selectedGroup} profile={profile} onBack={() => { setSelectedGroup(null); loadGroups(); }} />;
+  }
+
   return (
-    <PlaceholderModule
-      icon={Dumbbell}
-      title="Scripture Gym"
-      blurb="Train the Word like iron. A place to build, drill, and strengthen scripture memory for the men."
-      ideas={[
-        "Memory verses — add, organize, and review",
-        "Daily / weekly rep sets",
-        "Assign passages to members or groups",
-        "Track memorization streaks",
-      ]}
-    />
+    <Wrap>
+      <Head kicker="Command" title="Scripture Gym Curriculum"
+        sub="The official muscle groups & verses every guy sees. Locked to you alone — guys can still build their own personal groups elsewhere in the app."
+        right={<Btn kind="ghost" onClick={loadGroups}><RefreshCw size={14} /> Refresh</Btn>} />
+
+      <Card pad={18} style={{ marginBottom: 18 }}>
+        <Field label="Muscle Group Name" />
+        <input style={inputBase} value={newGroup.name}
+          onChange={e => setNewGroup(n => ({ ...n, name: e.target.value }))} placeholder="e.g. Spiritual Warfare" />
+        <div style={{ marginTop: 12 }}>
+          <Field label="Description (optional)" />
+          <input style={inputBase} value={newGroup.description}
+            onChange={e => setNewGroup(n => ({ ...n, description: e.target.value }))} />
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <Btn onClick={addGroup} disabled={saving}><Plus size={14} /> {saving ? "Adding…" : "Add Muscle Group"}</Btn>
+        </div>
+      </Card>
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : groups.length === 0 ? <Empty>No official muscle groups yet.</Empty> : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {groups.map(g => (
+            <Card key={g.id} pad={16} onClick={() => setSelectedGroup(g)}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <div>
+                <div style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, fontWeight: 600 }}>{g.name}</div>
+                <div style={{ fontFamily: T.body, fontSize: 12, color: T.muted2, marginTop: 2 }}>
+                  {g.verseCount} verse{g.verseCount === 1 ? "" : "s"}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button onClick={(e) => { e.stopPropagation(); deleteGroup(g); }}
+                  style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer" }}><Trash2 size={15} /></button>
+                <ChevronRight size={16} color={T.muted2} />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </Wrap>
+  );
+}
+
+function VerseEditor({ group, profile, onBack }) {
+  const [verses, setVerses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [draft, setDraft] = useState({ reference: "", verse_text: "", translation: "BSB" });
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("verses").select("*")
+      .eq("muscle_group_id", group.id).order("display_order", { ascending: true });
+    if (error) setErr(error.message); else { setVerses(data || []); setErr(null); }
+    setLoading(false);
+  }, [group.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const addVerse = async () => {
+    if (!draft.reference.trim() || !draft.verse_text.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from("verses").insert({
+      muscle_group_id: group.id, reference: draft.reference, verse_text: draft.verse_text,
+      translation: draft.translation || "BSB", display_order: verses.length + 1, created_by: profile?.id,
+    });
+    setSaving(false);
+    if (!error) {
+      logUpdate(profile?.email || "owner", "Verse added", `${draft.reference} → ${group.name}`);
+      setDraft({ reference: "", verse_text: "", translation: "BSB" });
+      load();
+    }
+  };
+
+  const startEdit = (v) => { setEditingId(v.id); setEditDraft({ reference: v.reference, verse_text: v.verse_text, translation: v.translation }); };
+  const saveEdit = async (id) => {
+    await supabase.from("verses").update(editDraft).eq("id", id);
+    logUpdate(profile?.email || "owner", "Verse edited", editDraft.reference);
+    setEditingId(null);
+    load();
+  };
+  const deleteVerse = async (v) => {
+    if (!window.confirm(`Delete ${v.reference}?`)) return;
+    await supabase.from("verses").delete().eq("id", v.id);
+    logUpdate(profile?.email || "owner", "Verse deleted", v.reference);
+    load();
+  };
+
+  return (
+    <Wrap>
+      <Head kicker="Command" title={group.name} sub={`${verses.length} verse${verses.length === 1 ? "" : "s"} in this muscle group`}
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back to Groups</Btn>} />
+
+      <Card pad={18} style={{ marginBottom: 18 }}>
+        <Field label="Reference" />
+        <input style={inputBase} value={draft.reference}
+          onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} placeholder="e.g. Romans 8:1" />
+        <div style={{ marginTop: 12 }}>
+          <Field label="Verse Text" />
+          <textarea rows={3} style={{ ...inputBase, resize: "vertical" }} value={draft.verse_text}
+            onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Field label="Translation" />
+          <input style={inputBase} value={draft.translation}
+            onChange={e => setDraft(d => ({ ...d, translation: e.target.value }))} />
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <Btn onClick={addVerse} disabled={saving}><Plus size={14} /> {saving ? "Adding…" : "Add Verse"}</Btn>
+        </div>
+      </Card>
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : verses.length === 0 ? <Empty>No verses in this group yet.</Empty> : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {verses.map(v => (
+            <Card key={v.id} pad={16}>
+              {editingId === v.id ? (
+                <>
+                  <input style={inputBase} value={editDraft.reference}
+                    onChange={e => setEditDraft(d => ({ ...d, reference: e.target.value }))} />
+                  <textarea rows={3} style={{ ...inputBase, marginTop: 8, resize: "vertical" }} value={editDraft.verse_text}
+                    onChange={e => setEditDraft(d => ({ ...d, verse_text: e.target.value }))} />
+                  <input style={{ ...inputBase, marginTop: 8 }} value={editDraft.translation}
+                    onChange={e => setEditDraft(d => ({ ...d, translation: e.target.value }))} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <Btn onClick={() => saveEdit(v.id)}><Save size={13} /> Save</Btn>
+                    <Btn kind="ghost" onClick={() => setEditingId(null)}>Cancel</Btn>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: T.body, fontSize: 14, color: T.cream, fontWeight: 700 }}>
+                      {v.reference} <span style={{ fontFamily: T.reg, fontSize: 10, color: T.muted2, textTransform: "uppercase" }}>({v.translation})</span>
+                    </div>
+                    <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 13.5, color: T.muted, margin: "8px 0 0", lineHeight: 1.5 }}>
+                      "{v.verse_text}"
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+                    <button onClick={() => startEdit(v)} style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer" }}><Pencil size={14} /></button>
+                    <button onClick={() => deleteVerse(v)} style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer" }}><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+    </Wrap>
   );
 }
 
@@ -515,7 +712,7 @@ export function AdminScreen({ view, profile }) {
   if (view === "gideon") return <Gideon />;
   if (view === "admin_robots") return <Robots profile={profile} />;
   if (view === "admin_constitution") return <Constitution />;
-  if (view === "admin_scripture_gym") return <ScriptureGym />;
+  if (view === "admin_scripture_gym") return <CurriculumEditor profile={profile} />;
   return null;
 }
 
