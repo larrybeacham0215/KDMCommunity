@@ -257,19 +257,22 @@ export async function fetchLeaderboard(limit = 100) {
   const ids = (statRows || []).map(r => r.user_id);
   if (ids.length === 0) return { data: [], error: null };
 
-  const { data: profiles, error: profErr } = await supabase
-    .from("profiles")
-    .select("id, full_name, email")
+  // Regular members can't read other people's `profiles` rows (RLS locks
+  // that to your own row) — member_directory is the name-only view built
+  // for exactly this: safely showing other guys' display names.
+  const { data: people, error: dirErr } = await supabase
+    .from("member_directory")
+    .select("id, display_name")
     .in("id", ids);
-  if (profErr) return { data: null, error: profErr };
+  if (dirErr) return { data: null, error: dirErr };
 
-  const profileById = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+  const nameById = Object.fromEntries((people || []).map(p => [p.id, p.display_name]));
 
   const ranked = statRows.map((r, i) => ({
     rank: i + 1,
     userId: r.user_id,
     total: r.total_memorized,
-    displayName: r.nickname || profileById[r.user_id]?.full_name || profileById[r.user_id]?.email?.split("@")[0] || "A brother",
+    displayName: r.nickname || nameById[r.user_id] || "A brother",
   }));
 
   return { data: ranked, error: null };

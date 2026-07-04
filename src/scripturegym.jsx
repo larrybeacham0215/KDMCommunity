@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2, Trophy } from "lucide-react";
 import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
   fetchMuscleGroups, fetchGroupVerses, fetchStats,
@@ -7,6 +7,7 @@ import {
   fetchContent, createMuscleGroup, createVerse, setMergedView,
   fetchMyCohorts, createCohort, deleteCohort, fetchCohortMembers, addCohortMember, removeCohortMember,
   fetchBadges, MILESTONE_THRESHOLDS, STREAK_THRESHOLDS,
+  fetchLeaderboard, setNickname,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -709,6 +710,71 @@ function CohortsScreen({ user, onBack }) {
   );
 }
 
+function LeaderboardScreen({ user, onBack }) {
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [savingNick, setSavingNick] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [lbRes, statsRes] = await Promise.all([fetchLeaderboard(100), fetchStats(user.id)]);
+    if (lbRes.error) setErr(lbRes.error.message); else { setRows(lbRes.data); setErr(null); }
+    if (statsRes.data) setNicknameInput(statsRes.data.nickname || "");
+    setLoading(false);
+  }, [user.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const saveNickname = async () => {
+    setSavingNick(true);
+    await setNickname(user.id, nicknameInput.trim() || null);
+    setSavingNick(false);
+    load();
+  };
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title="Leaderboard" sub="Top 100 — total verses memorized."
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      <Card pad={16} style={{ marginBottom: 18, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ flex: "1 1 220px" }}>
+          <Field label="Your Display Name (optional nickname for privacy)" />
+          <input style={inputBase} value={nicknameInput} onChange={e => setNicknameInput(e.target.value)}
+            placeholder="Leave blank to use your real name" />
+        </div>
+        <Btn onClick={saveNickname} disabled={savingNick}>{savingNick ? "Saving…" : "Save"}</Btn>
+      </Card>
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : rows.length === 0 ? <Empty>Nobody's memorized a verse yet — be the first!</Empty> : (
+        <div style={{ display: "grid", gap: 6 }}>
+          {rows.map(r => {
+            const isMe = r.userId === user.id;
+            return (
+              <Card key={r.userId} pad={13} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                border: isMe ? `1px solid ${T.bronze}` : undefined,
+                background: isMe ? "linear-gradient(90deg, rgba(200,134,46,.12), transparent)" : undefined,
+              }}>
+                <span style={{ fontFamily: T.display, fontSize: 16, color: r.rank <= 3 ? T.bronzeLt : T.muted2, width: 30, flexShrink: 0 }}>
+                  {r.rank}
+                </span>
+                <span style={{ fontFamily: T.body, fontSize: 13.5, color: T.cream, flex: 1, fontWeight: isMe ? 700 : 400 }}>
+                  {r.displayName}{isMe ? " (you)" : ""}
+                </span>
+                <span style={{ fontFamily: T.reg, fontSize: 13, color: T.bronzeLt }}>{r.total}</span>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </Wrap>
+  );
+}
+
 export function ScriptureGymApp({ user, role }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -721,6 +787,7 @@ export function ScriptureGymApp({ user, role }) {
   const [newGroupName, setNewGroupName] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
   const [showCohorts, setShowCohorts] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const isLeader = role === "owner" || role === "admin" || role === "cohort_leader";
 
   const load = useCallback(async () => {
@@ -761,6 +828,10 @@ export function ScriptureGymApp({ user, role }) {
     return <CohortsScreen user={user} onBack={() => setShowCohorts(false)} />;
   }
 
+  if (showLeaderboard) {
+    return <LeaderboardScreen user={user} onBack={() => setShowLeaderboard(false)} />;
+  }
+
   if (selectedGroup && workoutVerses) {
     return (
       <WorkoutSession
@@ -791,6 +862,7 @@ export function ScriptureGymApp({ user, role }) {
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
+            <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>
             <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
             <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>
             <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
