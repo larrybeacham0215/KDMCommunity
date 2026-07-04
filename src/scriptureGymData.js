@@ -392,7 +392,105 @@ export async function checkAndAwardBadges(userId) {
     .from("badges")
     .upsert(rows, { onConflict: "user_id,badge_type", ignoreDuplicates: true });
 
+  if (!error && toAward.length > 0) {
+    // Broadcast each newly-earned badge to every cohort this guy belongs to.
+    for (const badgeType of toAward) {
+      await logAchievementEvent(userId, badgeType);
+    }
+  }
+
   return { newBadges: error ? [] : toAward, error };
+}
+
+/* ---------------------------------------------------------------------------
+   COHORT ACTIVITY FEED  (achievements + leader posts, cheer reactions)
+   ------------------------------------------------------------------------- */
+
+// Fans an achievement out to every cohort the achiever currently belongs to.
+async function logAchievementEvent(userId, badgeType) {
+  const { data: event, error } = await supabase
+    .from("activity_events")
+    .insert({ user_id: userId, event_type: "badge_earned", payload: { badge_type: badgeType } })
+    .select().single();
+  if (error || !event) return { error };
+
+  const { data: memberships } = await supabase
+    .from("cohort_members").select("cohort_id").eq("user_id", userId);
+  const cohortIds = (memberships || []).map(m => m.cohort_id);
+  if (cohortIds.length === 0) return { error: null };
+
+  const rows = cohortIds.map(cohort_id => ({ event_id: event.id, cohort_id }));
+  return supabase.from("activity_event_cohorts").insert(rows);
+}
+
+// A leader posting an encouragement/announcement to one specific cohort he leads.
+export async function postToCohort(leaderId, cohortId, message) {
+  const { data: event, error } = await supabase
+    .from("activity_events")
+    .insert({ user_id: leaderId, event_type: "leader_post", payload: { message } })
+    .select().single();
+  if (error || !event) return { error };
+
+  return supabase.from("activity_event_cohorts").insert({ event_id: event.id, cohort_id: cohortId });
+}
+
+export async function fetchCohortsForMember(userId) {
+  const { data: memberships, error } = await supabase
+    .from("cohort_members").select("cohort_id").eq("user_id", userId);
+  if (error) return { data: null, error };
+  const ids = (memberships || []).map(m => m.cohort_id);
+  if (ids.length === 0) return { data: [], error: null };
+
+  const { data: cohorts, error: cErr } = await supabase
+    .from("cohorts").select("id, name, created_by").in("id", ids);
+  return { data: cohorts || [], error: cErr };
+}
+
+export async function fetchCohortFeed(cohortId, limit = 30) {
+  const { data: fanouts, error } = await supabase
+    .from("activity_event_cohorts").select("event_id").eq("cohort_id", cohortId);
+  if (error) return { data: null, error };
+  const eventIds = (fanouts || []).map(f => f.event_id);
+  if (eventIds.length === 0) return { data: [], error: null };
+
+  const { data: events, error: eErr } = await supabase
+    .from("activity_events").select("id, user_id, event_type, payload, created_at")
+    .in("id", eventIds).order("created_at", { ascending: false }).limit(limit);
+  if (eErr) return { data: null, error: eErr };
+
+  const { data: cheers, error: chErr } = await supabase
+    .from("activity_cheers").select("event_id, user_id, reaction")
+    .eq("cohort_id", cohortId).in("event_id", eventIds);
+  if (chErr) return { data: null, error: chErr };
+
+  const authorIds = [...new Set((events || []).map(e => e.user_id))];
+  const { data: people } = authorIds.length
+    ? await supabase.from("member_directory").select("id, display_name").in("id", authorIds)
+    : { data: [] };
+  const nameById = Object.fromEntries((people || []).map(p => [p.id, p.display_name]));
+
+  const cheersByEvent = {};
+  for (const c of cheers || []) {
+    (cheersByEvent[c.event_id] ||= []).push(c);
+  }
+
+  const enriched = (events || []).map(e => ({
+    ...e,
+    authorName: nameById[e.user_id] || "A brother",
+    cheers: cheersByEvent[e.id] || [],
+  }));
+
+  return { data: enriched, error: null };
+}
+
+export async function toggleCheer(eventId, cohortId, userId, reaction = "🔥") {
+  const { data: existing } = await supabase
+    .from("activity_cheers").select("id")
+    .eq("event_id", eventId).eq("cohort_id", cohortId).eq("user_id", userId).maybeSingle();
+  if (existing) {
+    return supabase.from("activity_cheers").delete().eq("id", existing.id);
+  }
+  return supabase.from("activity_cheers").insert({ event_id: eventId, cohort_id: cohortId, user_id: userId, reaction });
 }
 
 /* ---------------------------------------------------------------------------

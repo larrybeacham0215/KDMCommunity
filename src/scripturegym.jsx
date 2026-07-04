@@ -8,6 +8,7 @@ import {
   fetchMyCohorts, createCohort, deleteCohort, fetchCohortMembers, addCohortMember, removeCohortMember,
   fetchBadges, MILESTONE_THRESHOLDS, STREAK_THRESHOLDS,
   fetchLeaderboard, setNickname,
+  postToCohort, fetchCohortsForMember, fetchCohortFeed, toggleCheer,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -577,7 +578,97 @@ function ProgressScreen({ user, onBack }) {
     </Wrap>
   );
 }
-function CohortDetail({ cohort, onBack }) {
+function badgeLabel(badgeType) {
+  const [kind, n] = badgeType.split("_");
+  if (kind === "milestone") return `just crossed ${n} verses memorized`;
+  if (kind === "streak") return `hit a ${n}-day streak`;
+  return badgeType;
+}
+
+function FeedItem({ event, user, onCheerToggle }) {
+  const myCheer = event.cheers.find(c => c.user_id === user.id);
+  return (
+    <Card pad={14} style={{ marginBottom: 8 }}>
+      <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, lineHeight: 1.5 }}>
+        {event.event_type === "leader_post"
+          ? <><b>{event.authorName}</b>: "{event.payload.message}"</>
+          : <>🎉 <b>{event.authorName}</b> {badgeLabel(event.payload.badge_type)}</>}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+        <button onClick={() => onCheerToggle(event.id)} style={{
+          background: myCheer ? "rgba(200,134,46,.18)" : "transparent",
+          border: `1px solid ${myCheer ? T.bronze : T.line}`,
+          borderRadius: 100, padding: "4px 11px", cursor: "pointer",
+          fontFamily: T.body, fontSize: 12, color: myCheer ? T.bronzeLt : T.muted2,
+        }}>🔥 {event.cheers.length || ""}</button>
+        <span style={{ fontFamily: T.body, fontSize: 11, color: T.muted2 }}>
+          {new Date(event.created_at).toLocaleDateString()}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
+function CohortFeed({ cohortId, user }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await fetchCohortFeed(cohortId);
+    setEvents(data || []);
+    setLoading(false);
+  }, [cohortId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const cheer = async (eventId) => {
+    await toggleCheer(eventId, cohortId, user.id);
+    load();
+  };
+
+  if (loading) return <Loading />;
+  if (events.length === 0) return <Empty>No activity in this cohort yet.</Empty>;
+  return <div>{events.map(e => <FeedItem key={e.id} event={e} user={user} onCheerToggle={cheer} />)}</div>;
+}
+
+function MyCohortFeedsScreen({ user, onBack }) {
+  const [cohorts, setCohorts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    fetchCohortsForMember(user.id).then(({ data }) => { setCohorts(data || []); setLoading(false); });
+  }, [user.id]);
+
+  if (selected) {
+    return (
+      <Wrap>
+        <Head kicker="Scripture Gym" title={selected.name} sub="Cohort activity"
+          right={<Btn kind="ghost" onClick={() => setSelected(null)}><ChevronLeft size={14} /> Back</Btn>} />
+        <CohortFeed cohortId={selected.id} user={user} />
+      </Wrap>
+    );
+  }
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title="My Groups" sub="Cohorts you belong to."
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+      {loading ? <Loading /> : cohorts.length === 0 ? <Empty>You're not part of a cohort yet — ask a leader to add you.</Empty> : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {cohorts.map(c => (
+            <Card key={c.id} pad={16} onClick={() => setSelected(c)} style={{ cursor: "pointer" }}>
+              <div style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, fontWeight: 600 }}>{c.name}</div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </Wrap>
+  );
+}
+
+function CohortDetail({ cohort, user, onBack }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -609,6 +700,19 @@ function CohortDetail({ cohort, onBack }) {
     load();
   };
 
+  const [postText, setPostText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [feedKey, setFeedKey] = useState(0);
+
+  const post = async () => {
+    if (!postText.trim()) return;
+    setPosting(true);
+    await postToCohort(user.id, cohort.id, postText.trim());
+    setPosting(false);
+    setPostText("");
+    setFeedKey(k => k + 1);
+  };
+
   const availableToAdd = directory.filter(d => !members.some(m => m.userId === d.id));
 
   return (
@@ -635,6 +739,16 @@ function CohortDetail({ cohort, onBack }) {
           ))}
         </div>
       )}
+
+      <div style={{ marginTop: 26 }}>{sectionLabel("Post an Encouragement")}</div>
+      <Card pad={16} style={{ marginBottom: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input style={{ ...inputBase, flex: "1 1 220px" }} value={postText}
+          onChange={e => setPostText(e.target.value)} placeholder="Great push this week, gents…" />
+        <Btn onClick={post} disabled={posting}>{posting ? "Posting…" : "Post"}</Btn>
+      </Card>
+
+      {sectionLabel("Activity")}
+      <CohortFeed key={feedKey} cohortId={cohort.id} user={user} />
     </Wrap>
   );
 }
@@ -671,7 +785,7 @@ function CohortsScreen({ user, onBack }) {
   };
 
   if (selected) {
-    return <CohortDetail cohort={selected} onBack={() => { setSelected(null); load(); }} />;
+    return <CohortDetail cohort={selected} user={user} onBack={() => { setSelected(null); load(); }} />;
   }
 
   return (
@@ -788,6 +902,7 @@ export function ScriptureGymApp({ user, role }) {
   const [addingGroup, setAddingGroup] = useState(false);
   const [showCohorts, setShowCohorts] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showMyGroups, setShowMyGroups] = useState(false);
   const isLeader = role === "owner" || role === "admin" || role === "cohort_leader";
 
   const load = useCallback(async () => {
@@ -832,6 +947,10 @@ export function ScriptureGymApp({ user, role }) {
     return <LeaderboardScreen user={user} onBack={() => setShowLeaderboard(false)} />;
   }
 
+  if (showMyGroups) {
+    return <MyCohortFeedsScreen user={user} onBack={() => setShowMyGroups(false)} />;
+  }
+
   if (selectedGroup && workoutVerses) {
     return (
       <WorkoutSession
@@ -862,6 +981,7 @@ export function ScriptureGymApp({ user, role }) {
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
+            <Btn kind="ghost" onClick={() => setShowMyGroups(true)}><Users size={14} /> My Groups</Btn>
             <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>
             <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
             <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>
