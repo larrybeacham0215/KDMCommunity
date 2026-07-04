@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon } from "lucide-react";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp } from "lucide-react";
 import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
   fetchMuscleGroups, fetchGroupVerses, fetchStats,
-  setVerseStatus, incrementQuizCount, logWorkoutSession, fetchMemberDirectory,
+  setVerseStatus, incrementQuizCount, logWorkoutSession, fetchMemberDirectory, fetchSessionHistory,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -311,6 +311,106 @@ function WorkoutSession({ group, verses, user, onBack, onFinish }) {
 /* ===========================================================================
    SCRIPTURE GYM — member-facing entry point
    ========================================================================= */
+function SessionRow({ session }) {
+  const date = new Date(session.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return (
+    <Card pad={14} style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: T.body, fontSize: 13.5, color: T.cream, fontWeight: 600 }}>{session.groupName}</div>
+          <div style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, marginTop: 2 }}>
+            {date} · {session.verseCount} verse{session.verseCount === 1 ? "" : "s"}
+            {session.session_type === "paired"
+              ? ` · with ${session.partnerName || "a brother"}`
+              : " · solo"}
+          </div>
+        </div>
+        {session.session_type === "paired"
+          ? <Users size={15} color={T.muted2} />
+          : <UserIcon size={15} color={T.muted2} />}
+      </div>
+    </Card>
+  );
+}
+
+function ProgressScreen({ user, onBack }) {
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [groups, setGroups] = useState({ official: [], personal: [] });
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const [statsRes, groupsRes, historyRes] = await Promise.all([
+        fetchStats(user.id),
+        fetchMuscleGroups(user.id),
+        fetchSessionHistory(user.id, 20),
+      ]);
+      if (statsRes.error || groupsRes.error || historyRes.error) {
+        setErr((statsRes.error || groupsRes.error || historyRes.error).message);
+      } else {
+        setStats(statsRes.data);
+        setGroups(groupsRes.data);
+        setHistory(historyRes.data);
+        setErr(null);
+      }
+      setLoading(false);
+    })();
+  }, [user.id]);
+
+  const allGroups = [...groups.official, ...groups.personal];
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title="Progress" sub="Your lifetime record — a rep at a time."
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : (
+        <>
+          <div style={{ display: "flex", gap: 14, marginBottom: 26, flexWrap: "wrap" }}>
+            <Card pad={20} style={{ flex: "1 1 140px", textAlign: "center" }}>
+              <div style={{ fontFamily: T.display, fontSize: 30, color: T.bronzeLt, lineHeight: 1 }}>{stats?.total_memorized ?? 0}</div>
+              <div style={{ fontFamily: T.body, fontSize: 10.5, color: T.muted, textTransform: "uppercase", letterSpacing: ".08em", marginTop: 6 }}>Total Memorized</div>
+            </Card>
+            <Card pad={20} style={{ flex: "1 1 140px", textAlign: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <Flame size={20} color={T.emberHot} />
+                <span style={{ fontFamily: T.display, fontSize: 30, color: T.emberHot, lineHeight: 1 }}>{stats?.current_streak ?? 0}</span>
+              </div>
+              <div style={{ fontFamily: T.body, fontSize: 10.5, color: T.muted, textTransform: "uppercase", letterSpacing: ".08em", marginTop: 6 }}>Current Streak</div>
+            </Card>
+            <Card pad={20} style={{ flex: "1 1 140px", textAlign: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <TrendingUp size={19} color={T.bronzeLt} />
+                <span style={{ fontFamily: T.display, fontSize: 30, color: T.bronzeLt, lineHeight: 1 }}>{stats?.longest_streak ?? 0}</span>
+              </div>
+              <div style={{ fontFamily: T.body, fontSize: 10.5, color: T.muted, textTransform: "uppercase", letterSpacing: ".08em", marginTop: 6 }}>Longest Streak</div>
+            </Card>
+          </div>
+
+          {sectionLabel("By Muscle Group")}
+          {allGroups.length === 0 ? <Empty>No muscle groups yet.</Empty> : allGroups.map(g => (
+            <Card key={g.id} pad={14} style={{ marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: T.body, fontSize: 13, color: T.cream, marginBottom: 6 }}>
+                <span>{g.name}</span>
+                <span style={{ color: T.muted2, fontSize: 12 }}>{g.memorizedCount} / {g.verseCount}</span>
+              </div>
+              <ProgressBar value={g.memorizedCount} max={g.verseCount} />
+            </Card>
+          ))}
+
+          <div style={{ marginTop: 22 }}>{sectionLabel("Recent Sessions")}</div>
+          {history.length === 0
+            ? <Empty>No workout sessions logged yet — finish one from a muscle group to see it here.</Empty>
+            : history.map(s => <SessionRow key={s.id} session={s} />)}
+        </>
+      )}
+    </Wrap>
+  );
+}
 export function ScriptureGymApp({ user }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -318,6 +418,7 @@ export function ScriptureGymApp({ user }) {
   const [stats, setStats] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [workoutVerses, setWorkoutVerses] = useState(null);
+  const [showProgress, setShowProgress] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -336,6 +437,10 @@ export function ScriptureGymApp({ user }) {
   }, [user.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  if (showProgress) {
+    return <ProgressScreen user={user} onBack={() => setShowProgress(false)} />;
+  }
 
   if (selectedGroup && workoutVerses) {
     return (
@@ -364,7 +469,12 @@ export function ScriptureGymApp({ user }) {
     <Wrap>
       <Head kicker="The Gym" title="Scripture Gym"
         sub="Train the Word like iron. A place to build, drill, and strengthen scripture memory for the men."
-        right={<Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>} />
+        right={
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>
+            <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
+          </div>
+        } />
 
       {err && <ErrBox msg={err} />}
 

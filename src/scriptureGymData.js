@@ -280,3 +280,42 @@ export async function fetchMemberDirectory(excludeUserId) {
   if (error) return { data: null, error };
   return { data: (data || []).filter(m => m.id !== excludeUserId), error: null };
 }
+
+/* ---------------------------------------------------------------------------
+   SESSION HISTORY  (for the Progress screen)
+   ------------------------------------------------------------------------- */
+
+export async function fetchSessionHistory(userId, limit = 20) {
+  const { data: sessions, error } = await supabase
+    .from("workout_sessions")
+    .select("id, muscle_group_id, verse_ids, session_type, partner_user_id, notes, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return { data: null, error };
+  if (!sessions || sessions.length === 0) return { data: [], error: null };
+
+  const groupIds = [...new Set(sessions.map(s => s.muscle_group_id).filter(Boolean))];
+  const partnerIds = [...new Set(sessions.map(s => s.partner_user_id).filter(Boolean))];
+
+  const [{ data: groups }, { data: partners }] = await Promise.all([
+    groupIds.length
+      ? supabase.from("muscle_groups").select("id, name").in("id", groupIds)
+      : Promise.resolve({ data: [] }),
+    partnerIds.length
+      ? supabase.from("member_directory").select("id, display_name").in("id", partnerIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const groupById = Object.fromEntries((groups || []).map(g => [g.id, g.name]));
+  const partnerById = Object.fromEntries((partners || []).map(p => [p.id, p.display_name]));
+
+  const enriched = sessions.map(s => ({
+    ...s,
+    groupName: groupById[s.muscle_group_id] || "Muscle Group",
+    partnerName: s.partner_user_id ? (partnerById[s.partner_user_id] || "A brother") : null,
+    verseCount: (s.verse_ids || []).length,
+  }));
+
+  return { data: enriched, error: null };
+}
