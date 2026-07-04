@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Users, Brain, NotebookPen, Bot, Cpu, ScrollText, Plug, Workflow, Webhook,
   KeyRound, Activity, LayoutGrid, Plus, Trash2, Save, RefreshCw, Power,
-  Send, Shield, Sparkles, ChevronRight, X, AlertTriangle, Circle, CheckCircle2,
+  Send, Shield, Sparkles, ChevronRight, ChevronLeft, X, AlertTriangle, Circle, CheckCircle2,
   Dumbbell,
 } from "lucide-react";
 import { supabase } from "./dataService";
@@ -217,10 +217,14 @@ function Memories({ profile }) {
 /* ===========================================================================
    NOTEPAD
    ========================================================================= */
+const thStyle = { textAlign: "left", padding: "12px 16px", fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".14em", textTransform: "uppercase", color: T.muted };
+const tdStyle = { padding: "14px 16px", verticalAlign: "top" };
+
 function Notepad({ profile }) {
   const { rows, loading, err, reload } = useTable("notepad", "updated_at");
   const [draft, setDraft] = useState({ title: "", body: "" });
   const [saving, setSaving] = useState(false);
+  const [openId, setOpenId] = useState(null);
 
   const add = async () => {
     if (!draft.title.trim() && !draft.body.trim()) return;
@@ -229,8 +233,37 @@ function Notepad({ profile }) {
     setSaving(false);
     if (!error) { setDraft({ title: "", body: "" }); reload(); logUpdate(profile?.email || "owner", "Note added", draft.title); }
   };
-  const del = async (id) => { await supabase.from("notepad").delete().eq("id", id); reload(); };
+  const del = async (id) => {
+    await supabase.from("notepad").delete().eq("id", id);
+    reload();
+    if (openId === id) setOpenId(null);
+  };
 
+  const openNote = rows.find(n => n.id === openId);
+
+  // ---- DETAIL PAGE ----
+  if (openNote) {
+    return (
+      <Wrap>
+        <Head kicker="Command" title={openNote.title}
+          sub={`Updated ${fmt(openNote.updated_at || openNote.created_at)}`}
+          right={<Btn kind="ghost" onClick={() => setOpenId(null)}><ChevronLeft size={14} /> Back to Notepad</Btn>} />
+        <Card pad={24}>
+          {openNote.body
+            ? <p style={{ fontFamily: T.body, fontSize: 14, color: T.muted, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>{openNote.body}</p>
+            : <p style={{ fontFamily: T.body, color: T.muted2 }}>This note is empty.</p>}
+          <div style={{ marginTop: 20, paddingTop: 14, borderTop: `1px solid ${T.lineSoft}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2 }}>Created {fmt(openNote.created_at)}</span>
+            <button onClick={() => del(openNote.id)} style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: T.body, fontSize: 12.5 }}>
+              <Trash2 size={14} /> Delete
+            </button>
+          </div>
+        </Card>
+      </Wrap>
+    );
+  }
+
+  // ---- TABLE VIEW ----
   return (
     <Wrap>
       <Head kicker="Command" title="Notepad" sub="Quick scratchpad — thoughts, drafts, and reminders for running the operation." />
@@ -241,18 +274,39 @@ function Notepad({ profile }) {
       </Card>
       {err && <ErrBox msg={err} />}
       {loading ? <Loading /> : rows.length === 0 ? <Empty>Notepad is empty.</Empty> : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {rows.map(n => (
-            <Card key={n.id} pad={16}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 5 }}>
-                <span style={{ fontFamily: T.body, fontSize: 15, color: T.cream, fontWeight: 600 }}>{n.title}</span>
-                <button onClick={() => del(n.id)} style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer" }}><Trash2 size={15} /></button>
-              </div>
-              {n.body && <p style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{n.body}</p>}
-              <div style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, marginTop: 8 }}>Updated {fmt(n.updated_at || n.created_at)}</div>
-            </Card>
-          ))}
-        </div>
+        <Card pad={0} style={{ overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${T.line}` }}>
+                <th style={thStyle}>Title</th>
+                <th style={{ ...thStyle, width: 170 }}>Updated</th>
+                <th style={{ ...thStyle, width: 44 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((n, i) => (
+                <tr key={n.id}
+                  onClick={() => setOpenId(n.id)}
+                  style={{ borderBottom: i < rows.length - 1 ? `1px solid ${T.lineSoft}` : "none", cursor: "pointer" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(200,134,46,.06)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  <td style={tdStyle}>
+                    <div style={{ fontFamily: T.body, fontSize: 14, color: T.cream, fontWeight: 600 }}>{n.title}</div>
+                    {n.body && (
+                      <div style={{ fontFamily: T.body, fontSize: 12, color: T.muted2, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 540 }}>
+                        {n.body.replace(/\s+/g, " ").slice(0, 140)}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, fontFamily: T.body, fontSize: 12, color: T.muted2 }}>{fmt(n.updated_at || n.created_at)}</td>
+                  <td style={tdStyle}>
+                    <button onClick={(e) => { e.stopPropagation(); del(n.id); }} style={{ background: "none", border: "none", color: T.muted2, cursor: "pointer" }}><Trash2 size={14} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
     </Wrap>
   );
