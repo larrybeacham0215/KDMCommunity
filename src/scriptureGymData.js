@@ -597,3 +597,20 @@ export function computeNudge(stats) {
   // Beyond ~20 days: stop nudging entirely, per the original cadence design.
   return null;
 }
+
+/* ---------------------------------------------------------------------------
+   MASTER BIBLE LIBRARY  (full BSB text — 31,086 verses, public domain)
+   Independent of the `verses` table: this is the searchable reference
+   corpus a guy picks FROM; `verses` rows are what actually get assigned to
+   a muscle group and trained. Step 21/22 (search, auto-suggest) build on
+   this directly.
+   ------------------------------------------------------------------------- */
+
+export async function lookupBibleVerse(reference) {
+  const { data, error } = await supabase
+    .from("bible_verses")
+    .select("reference, verse_text, book_name, chapter, verse")
+    .ilike("reference", reference.trim())
+    .maybeSingle();
+  return { data, error };
+}
