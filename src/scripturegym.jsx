@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2, Trophy, Search } from "lucide-react";
 import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
@@ -9,7 +9,7 @@ import {
   fetchBadges, MILESTONE_THRESHOLDS, STREAK_THRESHOLDS,
   fetchLeaderboard, setNickname,
   postToCohort, fetchCohortsForMember, fetchCohortFeed, toggleCheer,
-  computeNudge, searchBibleVerses,
+  computeNudge, searchBibleVerses, suggestVerses,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -131,6 +131,97 @@ function VerseRow({ verse, selected, onToggle }) {
   );
 }
 
+function VerseAddForm({ groupId, userId, onAdded }) {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [manualText, setManualText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (selected || query.trim().length < 2) { setSuggestions([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      const { data } = await suggestVerses(query, 6);
+      setSuggestions(data || []);
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, selected]);
+
+  const pickSuggestion = (s) => {
+    setSelected(s);
+    setQuery(s.reference);
+    setSuggestions([]);
+  };
+
+  const clearSelection = () => {
+    setSelected(null);
+    setQuery("");
+    setManualText("");
+  };
+
+  const add = async () => {
+    const reference = selected?.reference || query.trim();
+    const text = selected?.verse_text || manualText.trim();
+    if (!reference || !text) return;
+    setSaving(true);
+    const { error } = await createVerse(groupId, userId, reference, text);
+    setSaving(false);
+    if (!error) { clearSelection(); onAdded(); }
+  };
+
+  const showManualFallback = !selected && query.trim().length >= 2 && suggestions.length === 0;
+
+  return (
+    <Card pad={16} style={{ marginBottom: 18 }}>
+      <Field label="Find a Verse — by Reference or Phrase" />
+      <input style={inputBase} value={query}
+        onChange={e => { setQuery(e.target.value); setSelected(null); }}
+        placeholder="e.g. Joshua 1:9, or “be strong and courageous”" />
+
+      {suggestions.length > 0 && (
+        <div style={{ marginTop: 8, border: `1px solid ${T.line}`, borderRadius: 8, overflow: "hidden" }}>
+          {suggestions.map(s => (
+            <div key={s.reference} onClick={() => pickSuggestion(s)} style={{
+              padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${T.lineSoft}`,
+            }}>
+              <div style={{ fontFamily: T.body, fontSize: 12.5, fontWeight: 700, color: T.cream }}>{s.reference}</div>
+              <div style={{
+                fontFamily: T.serif, fontStyle: "italic", fontSize: 11.5, color: T.muted2, marginTop: 2,
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>{s.verse_text}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selected && (
+        <div style={{ marginTop: 10, padding: 10, background: "rgba(200,134,46,.08)", borderRadius: 6, border: `1px solid ${T.bronze}` }}>
+          <div style={{ fontFamily: T.body, fontSize: 12, color: T.bronzeLt, fontWeight: 700 }}>{selected.reference}</div>
+          <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 12.5, color: T.muted, margin: "4px 0 0" }}>
+            "{selected.verse_text}"
+          </p>
+        </div>
+      )}
+
+      {showManualFallback && (
+        <div style={{ marginTop: 10 }}>
+          <Field label="Not found — type it yourself" />
+          <textarea rows={2} style={{ ...inputBase, resize: "vertical" }} value={manualText}
+            onChange={e => setManualText(e.target.value)} placeholder="Paste or type the verse text" />
+        </div>
+      )}
+
+      <div style={{ marginTop: 12 }}>
+        <Btn onClick={add} disabled={saving || (!selected && !manualText.trim())}>
+          {saving ? "Adding…" : "Add Verse"}
+        </Btn>
+      </div>
+    </Card>
+  );
+}
+
 function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -138,8 +229,6 @@ function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
   const [selected, setSelected] = useState(new Set());
   const [merged, setMerged] = useState(group.merged_view || false);
   const [mergeSaving, setMergeSaving] = useState(false);
-  const [draft, setDraft] = useState({ reference: "", verse_text: "" });
-  const [addSaving, setAddSaving] = useState(false);
   const isPersonal = group.owner_type === "personal";
 
   const load = useCallback(async () => {
@@ -167,14 +256,6 @@ function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
     setMergeSaving(false);
   };
 
-  const addVerse = async () => {
-    if (!draft.reference.trim() || !draft.verse_text.trim()) return;
-    setAddSaving(true);
-    const { error } = await createVerse(group.id, user.id, draft.reference, draft.verse_text);
-    setAddSaving(false);
-    if (!error) { setDraft({ reference: "", verse_text: "" }); load(); }
-  };
-
   return (
     <Wrap>
       <Head kicker="Scripture Gym" title={group.name}
@@ -195,21 +276,7 @@ function MuscleGroupDetail({ group, user, onBack, onStartWorkout }) {
         </Card>
       )}
 
-      {isPersonal && (
-        <Card pad={16} style={{ marginBottom: 18 }}>
-          <Field label="Reference" />
-          <input style={inputBase} value={draft.reference}
-            onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} placeholder="e.g. Joshua 1:9" />
-          <div style={{ marginTop: 10 }}>
-            <Field label="Verse Text" />
-            <textarea rows={2} style={{ ...inputBase, resize: "vertical" }} value={draft.verse_text}
-              onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} />
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <Btn onClick={addVerse} disabled={addSaving}>{addSaving ? "Adding…" : "Add Verse"}</Btn>
-          </div>
-        </Card>
-      )}
+      {isPersonal && <VerseAddForm groupId={group.id} userId={user.id} onAdded={load} />}
 
       {err && <ErrBox msg={err} />}
       {loading ? <Loading /> : verses.length === 0 ? <Empty>No verses in this muscle group yet.</Empty> : (

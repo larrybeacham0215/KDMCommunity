@@ -622,3 +622,34 @@ export async function searchBibleVerses(query, limit = 20) {
     .rpc("search_bible_verses", { search_query: trimmed, result_limit: limit });
   return { data: data || [], error };
 }
+
+// Used by the "add a custom verse" form: tries a fast reference-prefix
+// match first (e.g. "John 3:1" or "Rom 8"), and falls back to / supplements
+// with phrase search if that comes up thin — so typing either a reference
+// or a few words from the verse both work.
+export async function suggestVerses(query, limit = 8) {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return { data: [], error: null };
+
+  const { data: refMatches, error: refErr } = await supabase
+    .from("bible_verses")
+    .select("reference, verse_text, book_name, chapter, verse, book_order")
+    .ilike("reference", `${trimmed}%`)
+    .order("book_order", { ascending: true })
+    .order("chapter", { ascending: true })
+    .order("verse", { ascending: true })
+    .limit(limit);
+  if (refErr) return { data: null, error: refErr };
+
+  if (refMatches && refMatches.length >= 3) {
+    return { data: refMatches, error: null };
+  }
+
+  const { data: phraseMatches } = await searchBibleVerses(trimmed, limit);
+  const merged = [...(refMatches || [])];
+  const seen = new Set(merged.map(m => m.reference));
+  for (const p of (phraseMatches || [])) {
+    if (!seen.has(p.reference)) { merged.push(p); seen.add(p.reference); }
+  }
+  return { data: merged.slice(0, limit), error: null };
+}
