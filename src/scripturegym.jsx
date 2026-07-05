@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2, Trophy } from "lucide-react";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2, Trophy, Search } from "lucide-react";
 import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
   fetchMuscleGroups, fetchGroupVerses, fetchStats,
@@ -9,7 +9,7 @@ import {
   fetchBadges, MILESTONE_THRESHOLDS, STREAK_THRESHOLDS,
   fetchLeaderboard, setNickname,
   postToCohort, fetchCohortsForMember, fetchCohortFeed, toggleCheer,
-  computeNudge,
+  computeNudge, searchBibleVerses,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -890,6 +890,58 @@ function LeaderboardScreen({ user, onBack }) {
   );
 }
 
+function BibleSearchScreen({ onBack }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const runSearch = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setSearched(true);
+    const { data, error } = await searchBibleVerses(query, 20);
+    if (error) setErr(error.message); else { setResults(data); setErr(null); }
+    setLoading(false);
+  };
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title="Search the Bible" sub="Find a verse by what it says, not just its reference."
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      <Card pad={16} style={{ marginBottom: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input style={{ ...inputBase, flex: "1 1 220px" }} value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && runSearch()}
+          placeholder="e.g. good works, God so loved the world…" />
+        <Btn onClick={runSearch} disabled={loading}><Search size={14} /> {loading ? "Searching…" : "Search"}</Btn>
+      </Card>
+
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : !searched ? (
+        <Empty>Type a phrase or a few words from a verse you're trying to find.</Empty>
+      ) : results.length === 0 ? (
+        <Empty>No verses matched every one of those words — try fewer or different words.</Empty>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {results.map(r => (
+            <Card key={r.reference} pad={16}>
+              <div style={{ fontFamily: T.body, fontSize: 13.5, color: T.cream, fontWeight: 700, marginBottom: 6 }}>
+                {r.reference}
+              </div>
+              <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 13.5, color: T.muted, margin: 0, lineHeight: 1.55 }}>
+                "{r.verse_text}"
+              </p>
+            </Card>
+          ))}
+        </div>
+      )}
+    </Wrap>
+  );
+}
+
 export function ScriptureGymApp({ user, role }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -904,6 +956,7 @@ export function ScriptureGymApp({ user, role }) {
   const [showCohorts, setShowCohorts] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showMyGroups, setShowMyGroups] = useState(false);
+  const [showBibleSearch, setShowBibleSearch] = useState(false);
   const isLeader = role === "owner" || role === "admin" || role === "cohort_leader";
 
   const load = useCallback(async () => {
@@ -952,6 +1005,10 @@ export function ScriptureGymApp({ user, role }) {
     return <MyCohortFeedsScreen user={user} onBack={() => setShowMyGroups(false)} />;
   }
 
+  if (showBibleSearch) {
+    return <BibleSearchScreen onBack={() => setShowBibleSearch(false)} />;
+  }
+
   if (selectedGroup && workoutVerses) {
     return (
       <WorkoutSession
@@ -983,6 +1040,7 @@ export function ScriptureGymApp({ user, role }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
             <Btn kind="ghost" onClick={() => setShowMyGroups(true)}><Users size={14} /> My Groups</Btn>
+            <Btn kind="ghost" onClick={() => setShowBibleSearch(true)}><Search size={14} /> Search Bible</Btn>
             <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>
             <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
             <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>

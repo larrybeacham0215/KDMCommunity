@@ -614,3 +614,11 @@ export async function lookupBibleVerse(reference) {
     .maybeSingle();
   return { data, error };
 }
+
+export async function searchBibleVerses(query, limit = 20) {
+  const trimmed = query.trim();
+  if (!trimmed) return { data: [], error: null };
+  const { data, error } = await supabase
+    .rpc("search_bible_verses", { search_query: trimmed, result_limit: limit });
+  return { data: data || [], error };
+}
