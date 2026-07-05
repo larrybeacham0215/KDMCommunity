@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2, Trophy, Search } from "lucide-react";
+import { Dumbbell, Flame, ChevronRight, ChevronLeft, RefreshCw, AlertTriangle, Check, Eye, EyeOff, Users, User as UserIcon, TrendingUp, BookOpen, ChevronDown, ChevronUp, Trash2, Trophy, Search, Sparkles } from "lucide-react";
 import { T, Eyebrow, Card, Btn, Field, inputBase } from "./ui";
 import {
   fetchMuscleGroups, fetchGroupVerses, fetchStats,
@@ -10,6 +10,7 @@ import {
   fetchLeaderboard, setNickname,
   postToCohort, fetchCohortsForMember, fetchCohortFeed, toggleCheer,
   computeNudge, searchBibleVerses, suggestVerses,
+  proposeMuscleGroup, proposeVerse, fetchMyProposals,
 } from "./scriptureGymData";
 
 /* ===========================================================================
@@ -1009,6 +1010,159 @@ function BibleSearchScreen({ onBack }) {
   );
 }
 
+function ProposeContentScreen({ user, onBack }) {
+  const [officialGroups, setOfficialGroups] = useState([]);
+  const [myProposals, setMyProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [groupName, setGroupName] = useState("");
+  const [groupDesc, setGroupDesc] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
+
+  const [targetGroupId, setTargetGroupId] = useState("");
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedVerse, setSelectedVerse] = useState(null);
+  const [savingVerse, setSavingVerse] = useState(false);
+  const debounceRef = useRef(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [groupsRes, proposalsRes] = await Promise.all([
+      fetchMuscleGroups(user.id),
+      fetchMyProposals(user.id),
+    ]);
+    if (groupsRes.data) setOfficialGroups(groupsRes.data.official);
+    setMyProposals(proposalsRes.data || []);
+    setLoading(false);
+  }, [user.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (selectedVerse || query.trim().length < 2) { setSuggestions([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      const { data } = await suggestVerses(query, 6);
+      setSuggestions(data || []);
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, selectedVerse]);
+
+  const submitGroup = async () => {
+    if (!groupName.trim()) return;
+    setSavingGroup(true);
+    await proposeMuscleGroup(user.id, groupName.trim(), groupDesc.trim());
+    setSavingGroup(false);
+    setGroupName(""); setGroupDesc("");
+    load();
+  };
+
+  const submitVerse = async () => {
+    if (!targetGroupId || !selectedVerse) return;
+    setSavingVerse(true);
+    const group = officialGroups.find(g => g.id === targetGroupId);
+    await proposeVerse(user.id, targetGroupId, group?.name, selectedVerse.reference, selectedVerse.verse_text);
+    setSavingVerse(false);
+    setSelectedVerse(null); setQuery(""); setTargetGroupId("");
+    load();
+  };
+
+  return (
+    <Wrap>
+      <Head kicker="Scripture Gym" title="Propose Content"
+        sub="Suggest an addition to the official curriculum — the Super Admin reviews before it goes live."
+        right={<Btn kind="ghost" onClick={onBack}><ChevronLeft size={14} /> Back</Btn>} />
+
+      <div style={{ marginBottom: 10 }}>{sectionLabel("Propose a Muscle Group")}</div>
+      <Card pad={16} style={{ marginBottom: 22 }}>
+        <Field label="Name" />
+        <input style={inputBase} value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g. Perseverance" />
+        <div style={{ marginTop: 10 }}>
+          <Field label="Description (optional)" />
+          <input style={inputBase} value={groupDesc} onChange={e => setGroupDesc(e.target.value)} />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Btn onClick={submitGroup} disabled={savingGroup}>{savingGroup ? "Submitting…" : "Submit for Review"}</Btn>
+        </div>
+      </Card>
+
+      <div style={{ marginBottom: 10 }}>{sectionLabel("Propose a Verse")}</div>
+      <Card pad={16} style={{ marginBottom: 22 }}>
+        <Field label="Which Official Muscle Group?" />
+        <select style={inputBase} value={targetGroupId} onChange={e => setTargetGroupId(e.target.value)}>
+          <option value="">Select a muscle group…</option>
+          {officialGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+
+        <div style={{ marginTop: 10 }}>
+          <Field label="Find the Verse — by Reference or Phrase" />
+          <input style={inputBase} value={query}
+            onChange={e => { setQuery(e.target.value); setSelectedVerse(null); }}
+            placeholder="e.g. Hebrews 12:1, or “run with endurance”" />
+        </div>
+
+        {suggestions.length > 0 && (
+          <div style={{ marginTop: 8, border: `1px solid ${T.line}`, borderRadius: 8, overflow: "hidden" }}>
+            {suggestions.map(s => (
+              <div key={s.reference} onClick={() => { setSelectedVerse(s); setQuery(s.reference); setSuggestions([]); }} style={{
+                padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${T.lineSoft}`,
+              }}>
+                <div style={{ fontFamily: T.body, fontSize: 12.5, fontWeight: 700, color: T.cream }}>{s.reference}</div>
+                <div style={{
+                  fontFamily: T.serif, fontStyle: "italic", fontSize: 11.5, color: T.muted2, marginTop: 2,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                }}>{s.verse_text}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selectedVerse && (
+          <div style={{ marginTop: 10, padding: 10, background: "rgba(200,134,46,.08)", borderRadius: 6, border: `1px solid ${T.bronze}` }}>
+            <div style={{ fontFamily: T.body, fontSize: 12, color: T.bronzeLt, fontWeight: 700 }}>{selectedVerse.reference}</div>
+            <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 12.5, color: T.muted, margin: "4px 0 0" }}>
+              "{selectedVerse.verse_text}"
+            </p>
+          </div>
+        )}
+
+        <div style={{ marginTop: 12 }}>
+          <Btn onClick={submitVerse} disabled={savingVerse || !targetGroupId || !selectedVerse}>
+            {savingVerse ? "Submitting…" : "Submit for Review"}
+          </Btn>
+        </div>
+      </Card>
+
+      <div style={{ marginBottom: 10 }}>{sectionLabel("Your Proposals")}</div>
+      {loading ? <Loading /> : myProposals.length === 0 ? <Empty>You haven't proposed anything yet.</Empty> : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {myProposals.map(p => (
+            <Card key={p.id} pad={14}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div>
+                  <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, fontWeight: 600 }}>
+                    {p.proposal_type === "muscle_group" ? p.payload.name : p.payload.reference}
+                  </div>
+                  <div style={{ fontFamily: T.body, fontSize: 11, color: T.muted2, marginTop: 2 }}>
+                    {p.proposal_type === "muscle_group" ? "Muscle Group" : `Verse → ${p.payload.muscle_group_name || "?"}`}
+                  </div>
+                </div>
+                <span style={{
+                  fontFamily: T.reg, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em",
+                  padding: "3px 9px", borderRadius: 100, fontWeight: 700,
+                  background: p.status === "approved" ? "rgba(91,138,91,.18)" : p.status === "rejected" ? "rgba(212,80,43,.15)" : "rgba(200,134,46,.15)",
+                  color: p.status === "approved" ? "#8fc48f" : p.status === "rejected" ? T.emberLt : T.bronzeLt,
+                }}>{p.status}</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </Wrap>
+  );
+}
+
 export function ScriptureGymApp({ user, role }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -1024,7 +1178,9 @@ export function ScriptureGymApp({ user, role }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showMyGroups, setShowMyGroups] = useState(false);
   const [showBibleSearch, setShowBibleSearch] = useState(false);
+  const [showProposeContent, setShowProposeContent] = useState(false);
   const isLeader = role === "owner" || role === "admin" || role === "cohort_leader";
+  const isAdminOrOwner = role === "owner" || role === "admin";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1076,6 +1232,10 @@ export function ScriptureGymApp({ user, role }) {
     return <BibleSearchScreen onBack={() => setShowBibleSearch(false)} />;
   }
 
+  if (showProposeContent) {
+    return <ProposeContentScreen user={user} onBack={() => setShowProposeContent(false)} />;
+  }
+
   if (selectedGroup && workoutVerses) {
     return (
       <WorkoutSession
@@ -1108,6 +1268,7 @@ export function ScriptureGymApp({ user, role }) {
             {isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
             <Btn kind="ghost" onClick={() => setShowMyGroups(true)}><Users size={14} /> My Groups</Btn>
             <Btn kind="ghost" onClick={() => setShowBibleSearch(true)}><Search size={14} /> Search Bible</Btn>
+            {isAdminOrOwner && <Btn kind="ghost" onClick={() => setShowProposeContent(true)}><Sparkles size={14} /> Propose Content</Btn>}
             <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>
             <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
             <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>

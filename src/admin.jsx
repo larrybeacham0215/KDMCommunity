@@ -508,6 +508,20 @@ function CurriculumEditor({ profile }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [newGroup, setNewGroup] = useState({ name: "", description: "" });
   const [saving, setSaving] = useState(false);
+  const [proposals, setProposals] = useState([]);
+  const [proposalsLoading, setProposalsLoading] = useState(true);
+  const [reviewingId, setReviewingId] = useState(null);
+
+  const loadProposals = useCallback(async () => {
+    setProposalsLoading(true);
+    const { data } = await supabase
+      .from("content_proposals").select("*")
+      .eq("status", "pending").order("created_at", { ascending: true });
+    setProposals(data || []);
+    setProposalsLoading(false);
+  }, []);
+
+  useEffect(() => { loadProposals(); }, [loadProposals]);
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -526,6 +540,41 @@ function CurriculumEditor({ profile }) {
   }, []);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  const approve = async (p) => {
+    setReviewingId(p.id);
+    if (p.proposal_type === "muscle_group") {
+      await supabase.from("muscle_groups").insert({
+        name: p.payload.name, description: p.payload.description || "",
+        owner_type: "official", created_by: profile?.id,
+      });
+    } else if (p.proposal_type === "verse") {
+      await supabase.from("verses").insert({
+        muscle_group_id: p.payload.muscle_group_id,
+        reference: p.payload.reference, verse_text: p.payload.verse_text,
+        translation: p.payload.translation || "BSB", created_by: profile?.id,
+      });
+    }
+    await supabase.from("content_proposals")
+      .update({ status: "approved", reviewed_by: profile?.id, reviewed_at: new Date().toISOString() })
+      .eq("id", p.id);
+    logUpdate(profile?.email || "owner", "Proposal approved",
+      p.proposal_type === "muscle_group" ? p.payload.name : p.payload.reference);
+    setReviewingId(null);
+    loadProposals();
+    loadGroups();
+  };
+
+  const reject = async (p) => {
+    setReviewingId(p.id);
+    await supabase.from("content_proposals")
+      .update({ status: "rejected", reviewed_by: profile?.id, reviewed_at: new Date().toISOString() })
+      .eq("id", p.id);
+    logUpdate(profile?.email || "owner", "Proposal rejected",
+      p.proposal_type === "muscle_group" ? p.payload.name : p.payload.reference);
+    setReviewingId(null);
+    loadProposals();
+  };
 
   const addGroup = async () => {
     if (!newGroup.name.trim()) return;
@@ -558,6 +607,43 @@ function CurriculumEditor({ profile }) {
       <Head kicker="Command" title="Scripture Gym Curriculum"
         sub="The official muscle groups & verses every guy sees. Locked to you alone — guys can still build their own personal groups elsewhere in the app."
         right={<Btn kind="ghost" onClick={loadGroups}><RefreshCw size={14} /> Refresh</Btn>} />
+
+      {proposals.length > 0 && (
+        <>
+          <div style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: T.bronze, marginBottom: 10 }}>
+            Pending Proposals ({proposals.length})
+          </div>
+          <div style={{ display: "grid", gap: 10, marginBottom: 26 }}>
+            {proposals.map(p => (
+              <Card key={p.id} pad={16} style={{ border: `1px solid ${T.bronze}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: T.body, fontSize: 14, color: T.cream, fontWeight: 700 }}>
+                      {p.proposal_type === "muscle_group" ? p.payload.name : p.payload.reference}
+                    </div>
+                    <div style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, marginTop: 2 }}>
+                      {p.proposal_type === "muscle_group"
+                        ? (p.payload.description || "New muscle group")
+                        : `→ ${p.payload.muscle_group_name || "unknown group"}`}
+                    </div>
+                    {p.proposal_type === "verse" && (
+                      <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 12.5, color: T.muted, margin: "8px 0 0" }}>
+                        "{p.payload.verse_text}"
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <Btn onClick={() => approve(p)} disabled={reviewingId === p.id}>
+                      {reviewingId === p.id ? "…" : "Approve"}
+                    </Btn>
+                    <Btn kind="ghost" onClick={() => reject(p)} disabled={reviewingId === p.id}>Reject</Btn>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
 
       <Card pad={18} style={{ marginBottom: 18 }}>
         <Field label="Muscle Group Name" />

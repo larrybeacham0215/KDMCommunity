@@ -615,6 +615,71 @@ export async function lookupBibleVerse(reference) {
   return { data, error };
 }
 
+/* ---------------------------------------------------------------------------
+   CONTENT PROPOSAL QUEUE  (Admins suggest, Super Admin approves)
+   ------------------------------------------------------------------------- */
+
+export async function proposeMuscleGroup(adminId, name, description) {
+  return supabase.from("content_proposals").insert({
+    proposed_by: adminId,
+    proposal_type: "muscle_group",
+    payload: { name, description: description || "" },
+  });
+}
+
+export async function proposeVerse(adminId, muscleGroupId, muscleGroupName, reference, verseText, translation) {
+  return supabase.from("content_proposals").insert({
+    proposed_by: adminId,
+    proposal_type: "verse",
+    payload: {
+      muscle_group_id: muscleGroupId, muscle_group_name: muscleGroupName,
+      reference, verse_text: verseText, translation: translation || "BSB",
+    },
+  });
+}
+
+export async function fetchMyProposals(adminId) {
+  const { data, error } = await supabase
+    .from("content_proposals").select("*")
+    .eq("proposed_by", adminId)
+    .order("created_at", { ascending: false });
+  return { data: data || [], error };
+}
+
+export async function fetchPendingProposals() {
+  const { data, error } = await supabase
+    .from("content_proposals").select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  return { data: data || [], error };
+}
+
+export async function approveProposal(proposal, reviewerId) {
+  if (proposal.proposal_type === "muscle_group") {
+    const { error } = await supabase.from("muscle_groups").insert({
+      name: proposal.payload.name, description: proposal.payload.description || "",
+      owner_type: "official", created_by: reviewerId,
+    });
+    if (error) return { error };
+  } else if (proposal.proposal_type === "verse") {
+    const { error } = await supabase.from("verses").insert({
+      muscle_group_id: proposal.payload.muscle_group_id,
+      reference: proposal.payload.reference, verse_text: proposal.payload.verse_text,
+      translation: proposal.payload.translation || "BSB", created_by: reviewerId,
+    });
+    if (error) return { error };
+  }
+  return supabase.from("content_proposals")
+    .update({ status: "approved", reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
+    .eq("id", proposal.id);
+}
+
+export async function rejectProposal(proposalId, reviewerId) {
+  return supabase.from("content_proposals")
+    .update({ status: "rejected", reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
+    .eq("id", proposalId);
+}
+
 export async function searchBibleVerses(query, limit = 20) {
   const trimmed = query.trim();
   if (!trimmed) return { data: [], error: null };
