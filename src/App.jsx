@@ -107,8 +107,9 @@ const PROGRAMS = {
 /* ============================================================================
    SIDE MENU
    ========================================================================== */
-function SideMenu({ open, onClose, go, view, user, onLogout, isOwner }) {
+function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMember, onTogglePreview }) {
   const [sysOpen, setSysOpen] = useState(false);
+  const showCommand = isOwner && !previewMember;
   const items = [
     { id: "dashboard", label: "The Forge", icon: Flame },
     { id: "scripturegym", label: "Scripture Gym", icon: Dumbbell },
@@ -163,7 +164,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner }) {
         <nav style={{ padding: 12, flex: 1, overflowY: "auto" }}>
           {items.map(it => navBtn(it))}
 
-          {isOwner && (
+          {showCommand && (
             <>
               {sectionLabel("Command")}
               {OWNER_NAV.map(it => navBtn(it))}
@@ -185,13 +186,33 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner }) {
         </nav>
 
         <div style={{ padding: 16, borderTop: `1px solid ${T.lineSoft}` }}>
+          {isOwner && (
+            <button onClick={onTogglePreview} style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+              background: previewMember ? "rgba(200,134,46,.14)" : "transparent",
+              border: `1px solid ${previewMember ? T.bronze : T.line}`, borderRadius: 4,
+              padding: "9px 12px", marginBottom: 12, cursor: "pointer",
+              color: previewMember ? T.bronzeLt : T.muted, fontFamily: T.reg, fontSize: 12,
+            }}>
+              <span>{previewMember ? "Previewing as Member" : "Preview as Member"}</span>
+              <span style={{
+                width: 30, height: 16, borderRadius: 100, position: "relative", flexShrink: 0,
+                background: previewMember ? T.bronze : T.line, transition: "background .2s",
+              }}>
+                <span style={{
+                  position: "absolute", top: 2, left: previewMember ? 16 : 2, width: 12, height: 12,
+                  borderRadius: "50%", background: T.obsidian, transition: "left .2s",
+                }} />
+              </span>
+            </button>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: "50%", background: T.gold, display: "flex",
               alignItems: "center", justifyContent: "center", color: "#1a1206", fontFamily: T.reg, fontWeight: 700,
             }}>{(user.name[0] || "M").toUpperCase()}</div>
             <div style={{ overflow: "hidden" }}>
-              <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, textTransform: "capitalize" }}>{user.name}{isOwner && <span style={{ color: T.bronze, fontSize: 10, letterSpacing: ".1em", marginLeft: 6 }}>OWNER</span>}</div>
+              <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, textTransform: "capitalize" }}>{user.name}{showCommand && <span style={{ color: T.bronze, fontSize: 10, letterSpacing: ".1em", marginLeft: 6 }}>OWNER</span>}</div>
               <div style={{ fontFamily: T.body, fontSize: 11, color: T.muted2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email}</div>
             </div>
           </div>
@@ -645,6 +666,7 @@ export default function App() {
       || window.matchMedia("(display-mode: standalone)").matches;
     return isIOS && !isStandalone;
   });
+  const [previewMember, setPreviewMember] = useState(false);
 
   const streak = profile?.streak ?? 0;
   const user = session?.user
@@ -695,8 +717,36 @@ export default function App() {
   const isOwner = profile?.role === "owner";
   const titles = { dashboard: "The Forge", scripturegym: "Scripture Gym", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", ...ADMIN_TITLES };
 
+  const togglePreview = () => {
+    setPreviewMember(p => {
+      const next = !p;
+      // Turning preview ON while sitting on an owner-only screen would be
+      // confusing (nav hidden, but still viewing admin content) — bounce
+      // back to a normal member screen instead.
+      if (next && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems")) {
+        setView("scripturegym");
+      }
+      return next;
+    });
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: T.obsidian, color: T.cream, fontFamily: T.body }}>
+      {previewMember && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          padding: "9px 16px", background: T.bronze, borderBottom: `1px solid ${T.line}`,
+        }}>
+          <span style={{ fontFamily: T.reg, fontSize: 12.5, color: "#1a1206", fontWeight: 700, letterSpacing: ".03em" }}>
+            👁 PREVIEWING AS MEMBER
+          </span>
+          <button onClick={togglePreview} style={{
+            background: "rgba(10,9,7,.2)", border: "none", borderRadius: 3, color: "#1a1206",
+            fontFamily: T.reg, fontSize: 11.5, fontWeight: 700, padding: "4px 10px", cursor: "pointer",
+          }}>Exit Preview</button>
+        </div>
+      )}
+
       {showInstallBanner && (
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -713,7 +763,7 @@ export default function App() {
       )}
 
       <SideMenu open={menu} onClose={() => setMenu(false)} go={setView} view={view} user={user}
-        onLogout={logout} isOwner={isOwner} />
+        onLogout={logout} isOwner={isOwner} previewMember={previewMember} onTogglePreview={togglePreview} />
 
       {/* top bar */}
       <header style={{
@@ -733,16 +783,16 @@ export default function App() {
 
       <main style={{ padding: "26px 18px 60px" }}>
         {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} />}
-        {view === "scripturegym" && <ScriptureGymApp user={user} role={profile?.role} />}
+        {view === "scripturegym" && <ScriptureGymApp user={user} role={previewMember ? "member" : profile?.role} />}
         {view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
         {view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
         {view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}
         {view === "profile" && <Profile user={user} streak={streak} checkins={checkins} />}
 
         {/* Owner Command + Systems (UI gate; RLS enforces at the DB regardless) */}
-        {isOwner && (view.startsWith("admin_") || view === "gideon") && <AdminScreen view={view} profile={profile} />}
-        {isOwner && (view === "systems" || view.startsWith("sys_")) && <SystemsScreen view={view} go={setView} />}
-        {!isOwner && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems") && (
+        {isOwner && !previewMember && (view.startsWith("admin_") || view === "gideon") && <AdminScreen view={view} profile={profile} />}
+        {isOwner && !previewMember && (view === "systems" || view.startsWith("sys_")) && <SystemsScreen view={view} go={setView} />}
+        {(!isOwner || previewMember) && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems") && (
           <div style={{ maxWidth: 520, margin: "40px auto 0", textAlign: "center" }}>
             <p style={{ fontFamily: T.serif, fontStyle: "italic", color: T.bronzeLt, fontSize: 16 }}>This gate is for the owner alone.</p>
           </div>
