@@ -22,7 +22,7 @@ import { GymSessions } from "./gymSessions";
 function GymTabs({ tab, setTab }) {
   const item = (id, label) => (
     <button key={id} onClick={() => setTab(id)} style={{
-      background: "none", border: "none", cursor: "pointer", padding: "9px 2px",
+      background: "none", border: "none", cursor: "pointer", padding: "13px 2px", minHeight: 44,
       marginRight: 26, fontFamily: T.reg, fontSize: 12.5, letterSpacing: ".16em",
       textTransform: "uppercase", color: tab === id ? T.bronzeLt : T.muted2,
       borderBottom: `2px solid ${tab === id ? T.bronze : "transparent"}`,

@@ -83,7 +83,7 @@ export const Card = ({ children, pad = 22, style, ...rest }) => (
 /* Small inputs reused by admin forms */
 export const inputBase = {
   width: "100%", background: T.obsidian, border: `1px solid ${T.line}`, borderRadius: 2,
-  color: T.cream, padding: "12px 14px", fontFamily: T.body, fontSize: 14.5, outline: "none",
+  color: T.cream, padding: "12px 14px", fontFamily: T.body, fontSize: 16, outline: "none",
 };
 export const Field = ({ label }) => (
   <label style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".16em", textTransform: "uppercase", color: T.muted, display: "block", marginBottom: 6 }}>{label}</label>

@@ -151,7 +151,7 @@ function ProposeForm({ user, profile, onDone, onCancel }) {
         flexWrap: "wrap", gap: 12, marginBottom: 6 }}>
         <button onClick={onCancel} style={{ background: "none", border: "none", color: T.bronze,
           cursor: "pointer", fontFamily: T.reg, fontSize: 12, letterSpacing: ".12em",
-          textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
+          textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6, padding: "12px 4px 12px 0", minHeight: 44 }}>
           <ChevronLeft size={15} /> Back to the gym
         </button>
         <StatusPill status={direct ? "approved" : "draft"} />
@@ -360,7 +360,7 @@ function SessionDetail({ id, user, profile, onBack, onChanged }) {
       <button onClick={onBack} style={{ background: "none", border: "none", color: T.bronze,
         cursor: "pointer", fontFamily: T.reg, fontSize: 12, letterSpacing: ".12em",
         textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6,
-        padding: 0, marginBottom: 16 }}>
+        padding: "12px 4px 12px 0", minHeight: 44, marginBottom: 8 }}>
         <ChevronLeft size={15} /> All workouts
       </button>
 

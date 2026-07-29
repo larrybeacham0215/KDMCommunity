@@ -63,7 +63,7 @@ function Login() {
 
   const inputStyle = {
     width: "100%", background: T.obsidian, border: `1px solid ${T.line}`, borderRadius: 2,
-    color: T.cream, padding: "14px 14px 14px 42px", fontFamily: T.body, fontSize: 15, outline: "none",
+    color: T.cream, padding: "14px 14px 14px 42px", fontFamily: T.body, fontSize: 16, outline: "none",
   };
 
   const eyebrow = mode === "signup" ? "Answer The Call" : mode === "sent" ? "One Step Left" : "Members Only";
