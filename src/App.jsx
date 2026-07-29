@@ -9,6 +9,7 @@ import { supabase } from "./dataService";
 import { T, Crest, Eyebrow, Btn, Card } from "./ui";
 import { AdminScreen, SystemsScreen, OWNER_NAV, SYSTEMS_SUB, ADMIN_TITLES } from "./admin";
 import { ScriptureGymApp } from "./scripturegym";
+import { PublicSharePage, JoinPage } from "./gymSessions";
 
 /* ============================================================================
    KINGDOM OF DISCIPLINED MEN — Member App
@@ -804,6 +805,15 @@ export default function App() {
     document.head.appendChild(s);
   }, []);
 
+  // Public lanes. A shared session link has to work for a man who has never
+  // heard of this app, so these render before the sign-in wall and never wait
+  // on the auth handshake.
+  const q = new URLSearchParams(window.location.search);
+  const shareSlug = q.get("share");
+  const joinSlug = q.get("join");
+  if (shareSlug) return <PublicSharePage slug={shareSlug} />;
+  if (joinSlug) return <JoinPage slug={joinSlug} />;
+
   if (!authReady) return (
     <div style={{ minHeight: "100vh", background: T.obsidian, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Crest size={48} />
@@ -887,7 +897,7 @@ export default function App() {
 
       <main style={{ padding: "26px 18px 60px" }}>
         {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} staff={staff} />}
-        {view === "scripturegym" && <ScriptureGymApp user={user} role={previewMember ? "member" : profile?.role} />}
+        {view === "scripturegym" && <ScriptureGymApp user={user} role={previewMember ? "member" : profile?.role} profile={profile} />}
         {staff && view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
         {staff && view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
         {staff && view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}

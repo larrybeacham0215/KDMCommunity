@@ -12,6 +12,29 @@ import {
   computeNudge, searchBibleVerses, suggestVerses,
   proposeMuscleGroup, proposeVerse, fetchMyProposals,
 } from "./scriptureGymData";
+import { GymSessions } from "./gymSessions";
+
+/* ---------------------------------------------------------------------------
+   Two systems live behind one nav entry:
+     Sessions — live group workouts you show up to (gym_meetings)
+     Training — the memorization gym: muscle groups, verses, streaks
+   ------------------------------------------------------------------------- */
+function GymTabs({ tab, setTab }) {
+  const item = (id, label) => (
+    <button key={id} onClick={() => setTab(id)} style={{
+      background: "none", border: "none", cursor: "pointer", padding: "9px 2px",
+      marginRight: 26, fontFamily: T.reg, fontSize: 12.5, letterSpacing: ".16em",
+      textTransform: "uppercase", color: tab === id ? T.bronzeLt : T.muted2,
+      borderBottom: `2px solid ${tab === id ? T.bronze : "transparent"}`,
+    }}>{label}</button>
+  );
+  return (
+    <div style={{ borderBottom: `1px solid ${T.lineSoft}`, marginBottom: 20 }}>
+      {item("sessions", "Sessions")}
+      {item("training", "Training")}
+    </div>
+  );
+}
 
 /* ===========================================================================
    Local layout helpers — mirrors admin.jsx's Wrap/Head/Loading/Empty/ErrBox
@@ -1163,7 +1186,8 @@ function ProposeContentScreen({ user, onBack }) {
   );
 }
 
-export function ScriptureGymApp({ user, role }) {
+export function ScriptureGymApp({ user, role, profile }) {
+  const [tab, setTab] = useState("sessions");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [groups, setGroups] = useState({ official: [], personal: [] });
@@ -1181,6 +1205,9 @@ export function ScriptureGymApp({ user, role }) {
   const [showProposeContent, setShowProposeContent] = useState(false);
   const isLeader = role === "owner" || role === "admin" || role === "cohort_leader";
   const isAdminOrOwner = role === "owner" || role === "admin";
+  // `role` is already masked when the owner is previewing as a member, so the
+  // sessions layer inherits that masking rather than reading the raw profile.
+  const gymProfile = { ...(profile || {}), role, gym_keys: isAdminOrOwner ? true : profile?.gym_keys };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1199,6 +1226,19 @@ export function ScriptureGymApp({ user, role }) {
   }, [user.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Sessions is the default landing: live workouts are time-sensitive in a way
+  // that verse drilling is not.
+  if (tab === "sessions") {
+    return (
+      <Wrap>
+        <Head kicker="The Gym" title="Scripture Gym"
+          sub="Train the Word like iron. Show up, and bring someone with you." />
+        <GymTabs tab={tab} setTab={setTab} />
+        <GymSessions user={user} profile={gymProfile} />
+      </Wrap>
+    );
+  }
 
   const addGroup = async () => {
     if (!newGroupName.trim()) return;
@@ -1275,6 +1315,8 @@ export function ScriptureGymApp({ user, role }) {
             <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
           </div>
         } />
+
+      <GymTabs tab={tab} setTab={setTab} />
 
       {err && <ErrBox msg={err} />}
 
