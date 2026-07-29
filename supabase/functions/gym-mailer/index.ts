@@ -205,6 +205,15 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p("It's where the men train the Word like iron — live sessions, honest rooms, and the discipline of showing up."),
     ].join(""), { label: "Step in", url: APP }),
   }),
+
+  welcome_member: ({ name }) => ({
+    subject: "Welcome to the Kingdom",
+    html: shell("Welcome, brother", [
+      p(`${esc(name || "Brother")}, you're in. Your account is active — no link to click, nothing to verify.`),
+      p("The Scripture Gym is where the work happens: live sessions with other men, verses to train on, and the discipline of showing up when you don't feel like it."),
+      p(`<em style="color:#c8862e;">"A disciplined man builds a home where his whole family can thrive."</em>`),
+    ].join(""), { label: "Enter the Forge", url: APP }),
+  }),
 };
 
 /* ---------------------------------------------------------------------------

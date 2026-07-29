@@ -327,52 +327,181 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
    DASHBOARD ("The Forge")
    ========================================================================== */
 function Dashboard({ user, go, streak, progress, staff }) {
+  const [verse, setVerse] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [v, s] = await Promise.all([
+        supabase.rpc("verse_of_the_day"),
+        supabase.from("gym_meetings")
+          .select("id, title, scheduled_at, duration_minutes, cover_key, status, host_name, host:profiles!gym_meetings_host_id_fkey(full_name)")
+          .eq("status", "approved")
+          .order("scheduled_at", { ascending: true })
+          .limit(3),
+      ]);
+      if (!alive) return;
+      if (v.data) setVerse(v.data);
+      if (s.data) setSessions(s.data.filter(m => !m.scheduled_at || new Date(m.scheduled_at) > new Date(Date.now() - 36e5)));
+      setLoaded(true);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const when = (iso, mins) => {
+    if (!iso) return "Time to be set";
+    const d = new Date(iso);
+    return `${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · ${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}${mins ? ` · ${mins} min` : ""}`;
+  };
+  const countdown = (iso) => {
+    if (!iso) return null;
+    const ms = new Date(iso) - Date.now();
+    if (ms < 0) return "Happening now";
+    const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24;
+    if (d > 0) return `In ${d} day${d > 1 ? "s" : ""}`;
+    if (h > 0) return `In ${h} hour${h > 1 ? "s" : ""}`;
+    return "Starting soon";
+  };
+
   return (
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
       <Eyebrow>The Forge</Eyebrow>
-      <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 4px", textTransform: "capitalize" }}>
+      <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 18px", textTransform: "capitalize" }}>
         Welcome back, {user.name}.
       </h2>
-      <p style={{ fontFamily: T.serif, fontStyle: "italic", color: T.bronzeLt, fontSize: 15, marginBottom: 22 }}>
-        "A disciplined man builds a home where his whole family can thrive."
-      </p>
 
-      {/* streak banner */}
-      <Card pad={20} style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
-        <div style={{
-          width: 56, height: 56, borderRadius: "50%", border: `1px solid ${T.line}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: "radial-gradient(circle, rgba(255,106,60,.22), transparent 70%)",
-        }}><Flame size={26} color={T.emberHot} /></div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: T.display, fontSize: 26, color: T.cream, lineHeight: 1 }}>{streak} <span style={{ fontSize: 13, color: T.muted, fontFamily: T.reg }}>day streak</span></div>
-          <div style={{ fontFamily: T.body, fontSize: 13, color: T.muted, marginTop: 4 }}>
-            {staff ? "Keep the fire lit — check in today." : "Keep the fire lit."}
+      {/* ---- verse of the day: the front door into the Gym ---- */}
+      <Card pad={0} style={{ marginBottom: 18, overflow: "hidden", cursor: "pointer" }}
+        onClick={() => go("scripturegym")}>
+        <div style={{ padding: "22px 24px 20px",
+          background: "linear-gradient(135deg, rgba(200,134,46,.10), transparent 65%)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".26em",
+              textTransform: "uppercase", color: T.bronze }}>Today's verse</span>
+            {verse?.theme && (
+              <span style={{ fontFamily: T.reg, fontSize: 9.5, letterSpacing: ".18em",
+                textTransform: "uppercase", color: T.muted2, border: `1px solid ${T.lineSoft}`,
+                borderRadius: 20, padding: "3px 10px" }}>{verse.theme}</span>
+            )}
           </div>
-        </div>
-        {staff && <Btn onClick={() => go("checkin")}><Video size={15} /> Check In</Btn>}
-      </Card>
-
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr" }}>
-        {staff && Object.values(PROGRAMS).map(p => (
-          <Card key={p.id} pad={20} style={{ cursor: "pointer" }} >
-            <div onClick={() => go(p.id)}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-                <span style={{ fontFamily: T.reg, color: p.accent, fontSize: 13, letterSpacing: ".2em" }}>{p.roman}</span>
-                <span style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".22em", textTransform: "uppercase", color: T.muted2 }}>{p.tag}</span>
-              </div>
-              <h3 style={{ fontFamily: T.display, fontSize: 22, color: T.cream, marginBottom: 6 }}>{p.title}</h3>
-              <ProgressBar value={progress[p.id]} total={p.days} accent={p.accent} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
-                <span style={{ fontFamily: T.body, fontSize: 13, color: T.muted }}>Day {progress[p.id]} of {p.days}</span>
-                <span style={{ fontFamily: T.reg, fontSize: 12, color: T.bronzeLt, display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  Continue <ChevronRight size={14} />
+          {verse ? (
+            <>
+              <p style={{ fontFamily: T.serif, fontSize: 19, lineHeight: 1.5, color: T.cream, margin: "0 0 12px" }}>
+                “{verse.text}”
+              </p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <span style={{ fontFamily: T.reg, fontSize: 13, color: T.bronzeLt, letterSpacing: ".08em" }}>
+                  {verse.reference} <span style={{ color: T.muted2 }}>· {verse.translation}</span>
+                </span>
+                <span style={{ fontFamily: T.reg, fontSize: 12, color: T.bronzeLt,
+                  display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  Train it in the Gym <ChevronRight size={14} />
                 </span>
               </div>
-            </div>
-          </Card>
-        ))}
+            </>
+          ) : (
+            <p style={{ color: T.muted2, fontSize: 15, margin: 0 }}>
+              {loaded ? "Verse unavailable right now." : "Loading today's verse…"}
+            </p>
+          )}
+        </div>
+      </Card>
+
+      {/* ---- what's live in the Gym ---- */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "26px 0 12px" }}>
+        <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".26em",
+          textTransform: "uppercase", color: T.muted2 }}>In the gym</span>
+        <span onClick={() => go("scripturegym")} style={{ fontFamily: T.reg, fontSize: 12,
+          color: T.bronzeLt, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          See all <ChevronRight size={13} />
+        </span>
       </div>
+
+      {sessions.length > 0 ? (
+        <div style={{ display: "grid", gap: 12 }}>
+          {sessions.map(m => (
+            <Card key={m.id} pad={0} style={{ overflow: "hidden", cursor: "pointer" }}
+              onClick={() => go("scripturegym")}>
+              <div style={{ display: "flex", alignItems: "stretch" }}>
+                <div style={{ width: 6, background: T.gold, flex: "0 0 auto" }} />
+                <div style={{ padding: "16px 18px", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 7 }}>
+                    <span style={{ fontFamily: T.reg, fontSize: 9.5, fontWeight: 700, letterSpacing: ".16em",
+                      textTransform: "uppercase", color: T.bronzeLt, border: `1px solid ${T.line}`,
+                      borderRadius: 20, padding: "3px 9px" }}>{countdown(m.scheduled_at)}</span>
+                  </div>
+                  <div style={{ fontFamily: T.serif, fontSize: 17.5, color: T.cream, marginBottom: 5, lineHeight: 1.3 }}>
+                    {m.title}
+                  </div>
+                  <div style={{ fontFamily: T.body, fontSize: 13, color: T.muted }}>
+                    {m.host?.full_name || m.host_name || "Kingdom"} · {when(m.scheduled_at, m.duration_minutes)}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", paddingRight: 16 }}>
+                  <ChevronRight size={18} color={T.bronze} />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card pad={22}>
+          <div style={{ fontFamily: T.serif, fontSize: 18, color: T.cream, marginBottom: 6 }}>
+            {loaded ? "Nothing on the calendar yet" : "Loading sessions…"}
+          </div>
+          {loaded && (
+            <>
+              <p style={{ fontFamily: T.body, fontSize: 14, color: T.muted, marginTop: 0 }}>
+                Be the man who calls the first one. Set a time and put it in front of the brothers.
+              </p>
+              <Btn onClick={() => go("scripturegym")}><Dumbbell size={15} /> Start a workout</Btn>
+            </>
+          )}
+        </Card>
+      )}
+
+      {/* ---- streak, kept quiet ---- */}
+      <Card pad={18} style={{ display: "flex", alignItems: "center", gap: 15, marginTop: 18 }}>
+        <div style={{
+          width: 46, height: 46, borderRadius: "50%", border: `1px solid ${T.line}`,
+          display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto",
+          background: "radial-gradient(circle, rgba(255,106,60,.22), transparent 70%)",
+        }}><Flame size={22} color={T.emberHot} /></div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: T.display, fontSize: 23, color: T.cream, lineHeight: 1 }}>
+            {streak} <span style={{ fontSize: 12.5, color: T.muted, fontFamily: T.reg }}>day streak</span>
+          </div>
+          <div style={{ fontFamily: T.body, fontSize: 13, color: T.muted, marginTop: 4 }}>
+            {streak > 0 ? "Keep the fire lit." : "Show up once and the fire starts."}
+          </div>
+        </div>
+        {staff && <Btn kind="ghost" onClick={() => go("checkin")}><Video size={15} /> Check In</Btn>}
+      </Card>
+
+      {staff && (
+        <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr", marginTop: 18 }}>
+          {Object.values(PROGRAMS).map(p => (
+            <Card key={p.id} pad={20} style={{ cursor: "pointer" }}>
+              <div onClick={() => go(p.id)}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
+                  <span style={{ fontFamily: T.reg, color: p.accent, fontSize: 13, letterSpacing: ".2em" }}>{p.roman}</span>
+                  <span style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".22em", textTransform: "uppercase", color: T.muted2 }}>{p.tag}</span>
+                </div>
+                <h3 style={{ fontFamily: T.display, fontSize: 22, color: T.cream, marginBottom: 6 }}>{p.title}</h3>
+                <ProgressBar value={progress[p.id]} total={p.days} accent={p.accent} />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+                  <span style={{ fontFamily: T.body, fontSize: 13, color: T.muted }}>Day {progress[p.id]} of {p.days}</span>
+                  <span style={{ fontFamily: T.reg, fontSize: 12, color: T.bronzeLt, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    Continue <ChevronRight size={14} />
+                  </span>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
