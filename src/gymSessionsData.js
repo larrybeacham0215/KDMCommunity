@@ -35,6 +35,30 @@ const appBase = () => `${window.location.origin}${window.location.pathname.repla
 export const shareUrl = slug => `${appBase()}?share=${slug}`;
 export const joinUrl  = slug => `${appBase()}?join=${slug}`;
 
+/* THE SCRIPTURE GYM ROOM
+   Every gym event meets here unless someone deliberately overrides it.
+
+   The real source of truth is the DATABASE, not this line:
+       scripture_gym_content WHERE content_key = 'gym_join_url'
+   A database trigger stamps that value onto any meeting saved without a link,
+   so the room reaches the app, the share page and every email from one place.
+
+   TO CHANGE THE ROOM — one statement, no code deploy, no rebuild:
+       UPDATE public.scripture_gym_content
+          SET body = 'https://us06web.zoom.us/NEW', updated_at = now()
+        WHERE content_key = 'gym_join_url';
+       UPDATE public.gym_meetings SET join_url = public.gym_default_join_url();
+
+   This constant only prefills the propose form and covers the rare case where
+   a row somehow arrives empty. Keep it matched to the database value. */
+export const DEFAULT_JOIN_URL = "https://us06web.zoom.us/j/89018752634";
+
+/** The room for a public session, if it's open. Returns null when it isn't. */
+export async function fetchJoinUrl(slug) {
+  const { data, error } = await supabase.rpc("get_meeting_join_url", { p_slug: slug });
+  return { data: data || null, error };
+}
+
 /* ---------------------------------------------------------------------------
    READS
    ------------------------------------------------------------------------- */
@@ -91,7 +115,7 @@ export async function createMeeting(userId, form, status = "pending") {
     cover_key: form.cover_key || "iron",
     scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
     duration_minutes: Number(form.duration_minutes) || 60,
-    join_url: form.join_url || null,
+    join_url: (form.join_url || "").trim() || DEFAULT_JOIN_URL,
     status,
   };
   const { data, error } = await supabase

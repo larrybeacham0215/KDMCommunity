@@ -23,6 +23,12 @@ const SITE = "https://kdmcommunity.com";
 const APP = `${SITE}/app/`;
 const FROM = { email: "welcome@kdmcommunity.com", name: "Kingdom of Disciplined Men" };
 
+// The Scripture Gym room. Read live from scripture_gym_content.gym_join_url on
+// every invocation (see resolveRoom below) so changing the link in the database
+// changes it in the mail too — no redeploy. This literal is only the net.
+const ROOM_FALLBACK = "https://us06web.zoom.us/j/89018752634";
+let ROOM = ROOM_FALLBACK;
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -154,9 +160,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       questions(m.discussion_questions as string),
       p("Come with one honest answer. That's the whole entry fee."),
-    ].join(""), d.join_url || m.join_url
-      ? { label: "Open the meeting", url: String(d.join_url || m.join_url) }
-      : undefined),
+    ].join(""), { label: "Open the meeting", url: String(d.join_url || m.join_url || ROOM) }),
   }),
 
   reminder_24h: ({ d, m, name }) => ({
@@ -165,7 +169,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> is tomorrow.`),
       detail("When", when(m.scheduled_at as string)),
       questions(m.discussion_questions as string),
-    ].join(""), m.join_url ? { label: "Join the room", url: String(m.join_url) } : undefined),
+    ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
   }),
 
   reminder_1h: ({ d, m }) => ({
@@ -173,7 +177,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     html: shell("One hour out", [
       p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong> starts in an hour.`),
       p("Bring something to write with."),
-    ].join(""), m.join_url ? { label: "Join the room", url: String(m.join_url) } : undefined),
+    ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
   }),
 
   meeting_cancelled: ({ d, name }) => ({
@@ -232,6 +236,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // One read, one source of truth, shared by every template in this batch.
+    const { data: roomRow } = await db
+      .from("scripture_gym_content")
+      .select("body")
+      .eq("content_key", "gym_join_url")
+      .maybeSingle();
+    ROOM = String(roomRow?.body ?? "").trim() || ROOM_FALLBACK;
 
     const { data: queue, error } = await db
       .from("gym_notifications")

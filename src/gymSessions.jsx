@@ -9,6 +9,7 @@ import {
   createMeeting, updateMeeting, approveMeeting, rejectMeeting, cancelMeeting,
   completeMeeting, createInvite, getSharedMeeting, registerForMeeting,
   shareUrl, joinUrl, canPublishDirectly, isApprover, fmtWhen, isPast, toLocalInput,
+  DEFAULT_JOIN_URL, fetchJoinUrl,
 } from "./gymSessionsData";
 
 /* ===========================================================================
@@ -108,7 +109,7 @@ function SessionCard({ m, onOpen }) {
 
 const BLANK = {
   title: "", description: "", scheduled_at: toLocalInput(), duration_minutes: 60,
-  cover_key: "iron", join_url: "", focus_verses: "", discussion_questions: "",
+  cover_key: "iron", join_url: DEFAULT_JOIN_URL, focus_verses: "", discussion_questions: "",
   notes: "", host_name: "",
 };
 
@@ -197,9 +198,14 @@ function ProposeForm({ user, profile, onDone, onCancel }) {
             </div>
           </L>
 
-          <L label="Join link (Zoom / Meet)" full>
+          <L label="Meeting room" full>
             <input style={inputBase} value={f.join_url} onChange={e => set("join_url", e.target.value)}
-              placeholder="https://zoom.us/j/… — can be added later" />
+              placeholder={DEFAULT_JOIN_URL} />
+            <div style={{ color: T.muted2, fontSize: 12.5, marginTop: 6 }}>
+              {(f.join_url || "").trim() === DEFAULT_JOIN_URL || !(f.join_url || "").trim()
+                ? "The standard Scripture Gym room. Leave it as it is unless this one meets somewhere else."
+                : "Meeting somewhere other than the standard Scripture Gym room."}
+            </div>
           </L>
 
           <L label="Focus verses" full>
@@ -637,13 +643,9 @@ export function PublicSharePage({ slug }) {
             <p style={{ color: T.muted, fontSize: 14.5, marginTop: 0 }}>
               A confirmation is on its way to {form.email}. Bring one honest answer — that's the entry fee.
             </p>
-            {result.join_url
-              ? <Btn full onClick={() => window.open(result.join_url, "_blank")}>
-                  <Link2 size={15} /> Open the meeting
-                </Btn>
-              : <div style={{ color: T.muted2, fontSize: 13.5 }}>
-                  The room link lands in your inbox once this session is cleared.
-                </div>}
+            <Btn full onClick={() => window.open(result.join_url || DEFAULT_JOIN_URL, "_blank")}>
+              <Link2 size={15} /> Open the meeting
+            </Btn>
           </>
         ) : (
           <>
@@ -700,6 +702,7 @@ export function PublicSharePage({ slug }) {
 export function JoinPage({ slug }) {
   const [m, setM] = useState(null);
   const [err, setErr] = useState(null);
+  const [room, setRoom] = useState(null);
 
   useEffect(() => {
     getSharedMeeting(slug).then(({ data, error }) => {
@@ -707,7 +710,18 @@ export function JoinPage({ slug }) {
       else if (!data) setErr("We couldn't find that session.");
       else setM(data);
     });
+    // Kept separate from get_shared_meeting on purpose: the share page still
+    // takes a name and email before it gives the room away. This route is the
+    // handoff itself, so it resolves the room directly.
+    fetchJoinUrl(slug).then(({ data }) => setRoom(data || DEFAULT_JOIN_URL));
   }, [slug]);
+
+  // Hand off automatically, with a beat so the man sees where he's going.
+  useEffect(() => {
+    if (!room) return;
+    const t = setTimeout(() => { window.location.href = room; }, 1400);
+    return () => clearTimeout(t);
+  }, [room]);
 
   return (
     <PublicShell>
@@ -741,9 +755,17 @@ export function JoinPage({ slug }) {
           "A disciplined man builds a home where his whole family can thrive."
         </div>
 
-        <div style={{ fontSize: 12, color: T.muted2, marginTop: 10 }}>
-          This is a placeholder room. The real meeting link drops in here.
-        </div>
+        {room && !err && (
+          <>
+            <Btn full onClick={() => { window.location.href = room; }}>
+              <Link2 size={15} /> Open the room now
+            </Btn>
+            <div style={{ fontSize: 12, color: T.muted2, marginTop: 14, wordBreak: "break-all" }}>
+              Nothing happening? Go straight there:{" "}
+              <a href={room} style={{ color: T.gold }}>{room}</a>
+            </div>
+          </>
+        )}
       </Card>
     </PublicShell>
   );
