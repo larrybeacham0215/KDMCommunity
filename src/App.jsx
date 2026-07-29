@@ -22,8 +22,11 @@ import { ScriptureGymApp } from "./scripturegym";
    LOGIN
    ========================================================================== */
 function Login() {
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "sent"
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -37,10 +40,37 @@ function Login() {
     // success → App's onAuthStateChange picks up the session
   };
 
+  const submitSignup = async () => {
+    if (!name.trim()) return setErr("Enter your full name.");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setErr("Enter a valid email.");
+    if (pw.length < 8) return setErr("Password must be at least 8 characters.");
+    if (pw !== pw2) return setErr("Those passwords don't match.");
+    setErr(""); setLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: pw,
+      options: { data: { full_name: name.trim() } },
+    });
+    setLoading(false);
+    if (error) return setErr(error.message || "Couldn't create your account. Try again.");
+    // When email confirmation is required, Supabase returns a user but no session.
+    if (data?.user && !data?.session) return setMode("sent");
+    // Otherwise onAuthStateChange picks up the session and drops them into the app.
+  };
+
+  const go = (m) => { setMode(m); setErr(""); setPw(""); setPw2(""); };
+
   const inputStyle = {
     width: "100%", background: T.obsidian, border: `1px solid ${T.line}`, borderRadius: 2,
     color: T.cream, padding: "14px 14px 14px 42px", fontFamily: T.body, fontSize: 15, outline: "none",
   };
+
+  const eyebrow = mode === "signup" ? "Answer The Call" : mode === "sent" ? "One Step Left" : "Members Only";
+  const tagline = mode === "signup"
+    ? "Step through the gate for the first time."
+    : mode === "sent"
+      ? "Confirm your email to finish."
+      : "Step back through the gate.";
 
   return (
     <div style={{
@@ -49,34 +79,95 @@ function Login() {
     }}>
       <div style={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}><Crest size={54} /></div>
-        <div style={{ marginBottom: 6 }}><Eyebrow>Members Only</Eyebrow></div>
+        <div style={{ marginBottom: 6 }}><Eyebrow>{eyebrow}</Eyebrow></div>
         <h1 style={{
           fontFamily: T.display, fontSize: 30, color: T.cream, margin: "8px 0 4px",
           letterSpacing: ".01em", lineHeight: 1.05,
         }}>KINGDOM OF<br />DISCIPLINED MEN</h1>
         <p style={{ fontFamily: T.serif, fontStyle: "italic", color: T.bronzeLt, fontSize: 14, marginBottom: 26 }}>
-          Step back through the gate.
+          {tagline}
         </p>
 
-        <Card pad={24} style={{ textAlign: "left" }}>
-          <label style={lblStyle}>Email</label>
-          <div style={{ position: "relative", marginBottom: 14 }}>
-            <Mail size={16} style={iconInInput} />
-            <input style={inputStyle} type="email" value={email} placeholder="you@email.com"
-              onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
-          </div>
-          <label style={lblStyle}>Password</label>
-          <div style={{ position: "relative", marginBottom: 18 }}>
-            <Lock size={16} style={iconInInput} />
-            <input style={inputStyle} type="password" value={pw} placeholder="••••••••"
-              onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
-          </div>
-          {err && <p style={{ color: T.emberHot, fontFamily: T.body, fontSize: 13, marginBottom: 12 }}>{err}</p>}
-          <Btn full onClick={submit} disabled={loading}>{loading ? "Entering…" : <>Enter <ArrowRight size={15} /></>}</Btn>
-          <p style={{ textAlign: "center", marginTop: 16, color: T.muted2, fontFamily: T.body, fontSize: 12 }}>
-            Access is granted by application. Use the email and password set up for you.
-          </p>
-        </Card>
+        {mode === "sent" ? (
+          <Card pad={26}>
+            <Mail size={30} color={T.bronze} style={{ marginBottom: 12 }} />
+            <p style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, lineHeight: 1.6, marginBottom: 8 }}>
+              We sent a confirmation link to <strong style={{ color: T.bronzeLt }}>{email}</strong>.
+            </p>
+            <p style={{ fontFamily: T.body, fontSize: 13, color: T.muted, lineHeight: 1.55, marginBottom: 20 }}>
+              Click the link in that email to activate your account, then come back and sign in.
+            </p>
+            <Btn kind="outline" full onClick={() => go("login")}>Back to sign in</Btn>
+          </Card>
+        ) : mode === "signup" ? (
+          <Card pad={24} style={{ textAlign: "left" }}>
+            <label style={lblStyle}>Full Name</label>
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <User size={16} style={iconInInput} />
+              <input style={inputStyle} type="text" value={name} placeholder="Your name"
+                onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && submitSignup()} />
+            </div>
+            <label style={lblStyle}>Email</label>
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <Mail size={16} style={iconInInput} />
+              <input style={inputStyle} type="email" value={email} placeholder="you@email.com"
+                onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && submitSignup()} />
+            </div>
+            <label style={lblStyle}>Password</label>
+            <div style={{ position: "relative", marginBottom: 6 }}>
+              <Lock size={16} style={iconInInput} />
+              <input style={inputStyle} type="password" value={pw} placeholder="At least 8 characters"
+                onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submitSignup()} />
+            </div>
+            <p style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, marginBottom: 14 }}>
+              Minimum 8 characters.
+            </p>
+            <label style={lblStyle}>Confirm Password</label>
+            <div style={{ position: "relative", marginBottom: 18 }}>
+              <Lock size={16} style={iconInInput} />
+              <input style={inputStyle} type="password" value={pw2} placeholder="••••••••"
+                onChange={e => setPw2(e.target.value)} onKeyDown={e => e.key === "Enter" && submitSignup()} />
+            </div>
+            {err && <p style={{ color: T.emberHot, fontFamily: T.body, fontSize: 13, marginBottom: 12 }}>{err}</p>}
+            <Btn full onClick={submitSignup} disabled={loading}>
+              {loading ? "Creating your account…" : <>Create Account <ArrowRight size={15} /></>}
+            </Btn>
+            <p style={{ textAlign: "center", marginTop: 16, color: T.muted2, fontFamily: T.body, fontSize: 12 }}>
+              Already have an account?{" "}
+              <span style={{ color: T.bronzeLt, cursor: "pointer", textDecoration: "underline" }}
+                onClick={() => go("login")}>Sign in</span>
+            </p>
+          </Card>
+        ) : (
+          <Card pad={24} style={{ textAlign: "left" }}>
+            <label style={lblStyle}>Email</label>
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <Mail size={16} style={iconInInput} />
+              <input style={inputStyle} type="email" value={email} placeholder="you@email.com"
+                onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+            </div>
+            <label style={lblStyle}>Password</label>
+            <div style={{ position: "relative", marginBottom: 18 }}>
+              <Lock size={16} style={iconInInput} />
+              <input style={inputStyle} type="password" value={pw} placeholder="••••••••"
+                onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+            </div>
+            {err && <p style={{ color: T.emberHot, fontFamily: T.body, fontSize: 13, marginBottom: 12 }}>{err}</p>}
+            <Btn full onClick={submit} disabled={loading}>{loading ? "Entering…" : <>Enter <ArrowRight size={15} /></>}</Btn>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0 16px" }}>
+              <span style={{ flex: 1, height: 1, background: T.lineSoft }} />
+              <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".2em", color: T.muted2, textTransform: "uppercase" }}>New here</span>
+              <span style={{ flex: 1, height: 1, background: T.lineSoft }} />
+            </div>
+
+            <Btn kind="outline" full onClick={() => go("signup")}>Create an Account</Btn>
+
+            <p style={{ textAlign: "center", marginTop: 16, color: T.muted2, fontFamily: T.body, fontSize: 12 }}>
+              Already applied? Use the email and password set up for you.
+            </p>
+          </Card>
+        )}
       </div>
     </div>
   );
