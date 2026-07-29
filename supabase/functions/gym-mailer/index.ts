@@ -160,7 +160,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       questions(m.discussion_questions as string),
       p("Come with one honest answer. That's the whole entry fee."),
-    ].join(""), { label: "Open the meeting", url: String(d.join_url || m.join_url || ROOM) }),
+    // Live meeting row wins over the payload: the payload is a snapshot taken
+    // when the man registered, and the room can move between then and send.
+    ].join(""), { label: "Open the meeting", url: String(m.join_url || d.join_url || ROOM) }),
   }),
 
   reminder_24h: ({ d, m, name }) => ({
