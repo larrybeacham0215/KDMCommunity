@@ -309,7 +309,10 @@ Deno.serve(async (req) => {
       });
 
       if (dryRun) {
-        preview.push({ to: row.recipient_email, template: row.template_key, subject });
+        // Where the button actually points — the thing most worth checking
+        // before a batch goes out.
+        const cta = html.match(/color:#c8862e;">(https?:\/\/[^<]+)<\/a>/)?.[1] ?? null;
+        preview.push({ to: row.recipient_email, template: row.template_key, subject, cta });
         continue;
       }
 
