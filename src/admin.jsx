@@ -104,7 +104,13 @@ function AdminUsers({ profile }) {
   const { rows, loading, err, reload, setRows } = useTable("profiles", "created_at");
   const [busy, setBusy] = useState(null);
 
-  const ROLE_LABELS = { owner: "Owner", admin: "Admin", cohort_leader: "Cohort Leader", member: "Member" };
+  const ROLE_LABELS = { owner: "Super Admin", admin: "Admin", cohort_leader: "Cohort Leader", member: "Member" };
+  const TIER_ORDER = ["owner", "admin", "cohort_leader", "member"];
+  const counts = TIER_ORDER.map(r => ({
+    role: r,
+    label: ROLE_LABELS[r],
+    n: rows.filter(u => (u.role || "member") === r).length,
+  }));
 
   const setRole = async (u, role) => {
     if (role === "owner" && !window.confirm(`Make ${u.full_name || u.email} a Super Admin (Owner)? This gives full control of the app, including the curriculum and every member's data.`)) return;
@@ -123,6 +129,16 @@ function AdminUsers({ profile }) {
         sub="Everyone in the Kingdom. Super Admin owns the curriculum; Admins manage people & cohorts; Cohort Leaders shepherd their own group."
         right={<Btn kind="ghost" onClick={reload}><RefreshCw size={14} /> Refresh</Btn>} />
       {err && <ErrBox msg={err} />}
+      {!loading && rows.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          {counts.map(c => (
+            <Card key={c.role} pad={14} style={{ flex: "1 1 120px", minWidth: 120 }}>
+              <div style={{ fontFamily: T.display, fontSize: 26, color: c.role === "owner" ? T.gold : T.cream, lineHeight: 1 }}>{c.n}</div>
+              <div style={{ fontFamily: T.reg, fontSize: 10, letterSpacing: ".15em", textTransform: "uppercase", color: T.muted2, marginTop: 5 }}>{c.label}{c.n === 1 ? "" : "s"}</div>
+            </Card>
+          ))}
+        </div>
+      )}
       {loading ? <Loading /> : rows.length === 0 ? <Empty>No members yet.</Empty> : (
         <div style={{ display: "grid", gap: 10 }}>
           {rows.map(u => (

@@ -201,12 +201,16 @@ const PROGRAMS = {
 function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMember, onTogglePreview }) {
   const [sysOpen, setSysOpen] = useState(false);
   const showCommand = isOwner && !previewMember;
+  // The two programs and Daily Check-In are Super Admin only for now.
+  // Members see The Forge, Scripture Gym and their profile until these open up.
   const items = [
     { id: "dashboard", label: "The Forge", icon: Flame },
     { id: "scripturegym", label: "Scripture Gym", icon: Dumbbell },
-    { id: "p30", label: "30-Day Intensive", icon: ShieldCheck },
-    { id: "p90", label: "90-Day Curriculum", icon: BookOpen },
-    { id: "checkin", label: "Daily Check-In", icon: CalendarCheck },
+    ...(showCommand ? [
+      { id: "p30", label: "30-Day Intensive", icon: ShieldCheck },
+      { id: "p90", label: "90-Day Curriculum", icon: BookOpen },
+      { id: "checkin", label: "Daily Check-In", icon: CalendarCheck },
+    ] : []),
     { id: "profile", label: "My Profile", icon: User },
   ];
   const navBtn = (it, opts = {}) => {
@@ -321,7 +325,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
 /* ============================================================================
    DASHBOARD ("The Forge")
    ========================================================================== */
-function Dashboard({ user, go, streak, progress }) {
+function Dashboard({ user, go, streak, progress, staff }) {
   return (
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
       <Eyebrow>The Forge</Eyebrow>
@@ -341,13 +345,15 @@ function Dashboard({ user, go, streak, progress }) {
         }}><Flame size={26} color={T.emberHot} /></div>
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: T.display, fontSize: 26, color: T.cream, lineHeight: 1 }}>{streak} <span style={{ fontSize: 13, color: T.muted, fontFamily: T.reg }}>day streak</span></div>
-          <div style={{ fontFamily: T.body, fontSize: 13, color: T.muted, marginTop: 4 }}>Keep the fire lit — check in today.</div>
+          <div style={{ fontFamily: T.body, fontSize: 13, color: T.muted, marginTop: 4 }}>
+            {staff ? "Keep the fire lit — check in today." : "Keep the fire lit."}
+          </div>
         </div>
-        <Btn onClick={() => go("checkin")}><Video size={15} /> Check In</Btn>
+        {staff && <Btn onClick={() => go("checkin")}><Video size={15} /> Check In</Btn>}
       </Card>
 
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr" }}>
-        {Object.values(PROGRAMS).map(p => (
+        {staff && Object.values(PROGRAMS).map(p => (
           <Card key={p.id} pad={20} style={{ cursor: "pointer" }} >
             <div onClick={() => go(p.id)}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
@@ -806,6 +812,10 @@ export default function App() {
   if (!user) return <Login />;
 
   const isOwner = profile?.role === "owner";
+  // Staff = Super Admin, not currently previewing as a member. Gates the two
+  // programs and Daily Check-In as well as the Command section.
+  const staff = isOwner && !previewMember;
+  const STAFF_ONLY_VIEWS = ["p30", "p90", "checkin"];
   const titles = { dashboard: "The Forge", scripturegym: "Scripture Gym", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", ...ADMIN_TITLES };
 
   const togglePreview = () => {
@@ -814,7 +824,7 @@ export default function App() {
       // Turning preview ON while sitting on an owner-only screen would be
       // confusing (nav hidden, but still viewing admin content) — bounce
       // back to a normal member screen instead.
-      if (next && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems")) {
+      if (next && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems" || STAFF_ONLY_VIEWS.includes(view))) {
         setView("scripturegym");
       }
       return next;
@@ -867,17 +877,25 @@ export default function App() {
           <Crest size={26} />
           <span style={{ fontFamily: T.reg, fontSize: 13.5, letterSpacing: ".06em", color: T.cream }}>{titles[view]}</span>
         </div>
-        <button onClick={() => setView("checkin")} style={{ marginLeft: "auto", background: "none", border: "none", color: T.emberHot, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+        <div
+          onClick={() => { if (staff) setView("checkin"); }}
+          style={{ marginLeft: "auto", color: T.emberHot, cursor: staff ? "pointer" : "default", display: "flex", alignItems: "center", gap: 5 }}
+        >
           <Flame size={18} /><span style={{ fontFamily: T.reg, fontSize: 13 }}>{streak}</span>
-        </button>
+        </div>
       </header>
 
       <main style={{ padding: "26px 18px 60px" }}>
-        {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} />}
+        {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} staff={staff} />}
         {view === "scripturegym" && <ScriptureGymApp user={user} role={previewMember ? "member" : profile?.role} />}
-        {view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
-        {view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
-        {view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}
+        {staff && view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
+        {staff && view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
+        {staff && view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}
+        {!staff && STAFF_ONLY_VIEWS.includes(view) && (
+          <div style={{ maxWidth: 520, margin: "40px auto 0", textAlign: "center" }}>
+            <p style={{ fontFamily: T.serif, fontStyle: "italic", color: T.bronzeLt, fontSize: 16 }}>Not yet opened. Hold the line.</p>
+          </div>
+        )}
         {view === "profile" && <Profile user={user} streak={streak} checkins={checkins} />}
 
         {/* Owner Command + Systems (UI gate; RLS enforces at the DB regardless) */}
