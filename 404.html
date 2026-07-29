@@ -104,8 +104,19 @@
   .btn.ghost::after{display:none}
   .btn.ghost:hover{border-color:var(--bronze);color:var(--bronze-lt);box-shadow:none}
   .btn .arr{transition:transform .3s}.btn:hover .arr{transform:translateX(4px)}
-  .nav-links a.btn{color:#1a1206;text-shadow:0 1px 0 rgba(255,255,255,.18)}
+  /* Nav "Enter" button: the .nav-links a::after underline was overriding .btn::after
+     (higher specificity), killing the shine sweep and painting a stray 1px bar across
+     the button on hover. Restore the sweep and size it to sit correctly in the bar. */
+  .nav-links a.btn{color:#1a1206;text-shadow:0 1px 0 rgba(255,255,255,.18);
+    padding:.72rem 1.35rem;font-size:.72rem;letter-spacing:.16em;margin-left:.6rem}
   .nav-links a.btn:hover{color:#120c04}
+  .nav-links a.btn::after{content:"";position:absolute;top:0;left:-120%;bottom:auto;
+    width:60%;height:100%;border-radius:0;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+    transform:skewX(-18deg);animation:sweep 4.5s ease-in-out infinite;transition:none}
+  .nav-links a.btn:hover::after{width:60%}
+  header.scrolled .nav-links a.btn{padding:.62rem 1.2rem}
+  @media (prefers-reduced-motion:reduce){.nav-links a.btn::after{animation:none}}
   /* mobile menu scrim + scroll lock */
   .nav-scrim{position:fixed;inset:0;background:rgba(5,4,3,.62);backdrop-filter:blur(3px);
     opacity:0;visibility:hidden;transition:opacity .35s ease,visibility .35s;z-index:1090}
@@ -393,7 +404,9 @@
     .nav-links a::after{display:none}
     .nav-links a:active{color:var(--bronze-lt)}
     .nav-links li:last-child{margin-top:1.2rem;border:none}
-    .nav-links .btn{width:100%;justify-content:center;border-bottom:none;color:#1a1206;font-size:.82rem;padding:1.05rem}
+    .nav-links a.btn{width:100%;justify-content:center;border-bottom:none;color:#1a1206;
+      font-size:.82rem;letter-spacing:.15em;padding:1.05rem;margin-left:0}
+    header.scrolled .nav-links a.btn{padding:1.05rem}
     .burger{display:flex}
     .burger.x span:nth-child(1){transform:translateY(7px) rotate(45deg)}
     .burger.x span:nth-child(2){opacity:0}
@@ -861,12 +874,49 @@
     if(!matchMedia('(prefers-reduced-motion:reduce)').matches)loop();
   })();
 
-  // forms (front-end confirmation only)
-  function ok(input,note,msg){var v=input.value.trim();
-    if(!v||(input.type==='email'&&!/^[^@]+@[^@]+\.[^@]+$/.test(v))){note.style.color='var(--ember-lt)';note.textContent='Enter a valid email to continue.';return;}
-    note.style.color='var(--bronze-lt)';note.textContent=msg;input.value='';}
-  document.getElementById('notifyBtn').addEventListener('click',function(){ok(document.getElementById('bookEmail'),document.getElementById('bookNote'),'You\'re on the list — watch your inbox for launch day. 🔥');});
-  document.getElementById('applyBtn').addEventListener('click',function(){ok(document.getElementById('applyEmail'),document.getElementById('applyNote'),'Application received. Larry\'s team will reach out shortly. 🔥');});
+  // forms — submit to Supabase (applications table, anon-insert + owner-read RLS)
+  var SB_URL='https://cibevunbazujwvhqhkro.supabase.co';
+  var SB_KEY='sb_publishable_F_BgmwyD3OgkpbRVINvI1A_PfSBA8AK';
+
+  function submitApplication(payload){
+    return fetch(SB_URL+'/rest/v1/applications',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,
+               'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    }).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); });
+  }
+
+  function wireForm(btn,nameEl,emailEl,note,source,msg){
+    btn.addEventListener('click',function(){
+      var email=emailEl.value.trim();
+      var name=nameEl?nameEl.value.trim():'';
+      if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+        note.style.color='var(--ember-lt)';note.textContent='Enter a valid email to continue.';return;}
+      if(nameEl&&!name){
+        note.style.color='var(--ember-lt)';note.textContent='Enter your name to continue.';return;}
+      btn.disabled=true;btn.style.opacity='.6';
+      note.style.color='var(--muted)';note.textContent='Sending…';
+      submitApplication({full_name:name||email.split('@')[0],email:email,source:source})
+        .then(function(){
+          note.style.color='var(--bronze-lt)';note.textContent=msg;
+          emailEl.value='';if(nameEl)nameEl.value='';
+        })
+        .catch(function(){
+          note.style.color='var(--ember-lt)';
+          note.textContent='Something went wrong sending that. Please email larrybeacham@gmail.com directly.';
+        })
+        .then(function(){btn.disabled=false;btn.style.opacity='1';});
+    });
+  }
+
+  wireForm(document.getElementById('notifyBtn'),null,document.getElementById('bookEmail'),
+    document.getElementById('bookNote'),'book',
+    "You're on the list — watch your inbox for launch day. 🔥");
+
+  wireForm(document.getElementById('applyBtn'),document.getElementById('applyName'),
+    document.getElementById('applyEmail'),document.getElementById('applyNote'),'apply',
+    "Application received. Larry's team will reach out shortly. 🔥");
 </script>
 </body>
 </html>
