@@ -104,8 +104,19 @@
   .btn.ghost::after{display:none}
   .btn.ghost:hover{border-color:var(--bronze);color:var(--bronze-lt);box-shadow:none}
   .btn .arr{transition:transform .3s}.btn:hover .arr{transform:translateX(4px)}
-  .nav-links a.btn{color:#1a1206;text-shadow:0 1px 0 rgba(255,255,255,.18)}
+  /* Nav "Enter" button: the .nav-links a::after underline was overriding .btn::after
+     (higher specificity), killing the shine sweep and painting a stray 1px bar across
+     the button on hover. Restore the sweep and size it to sit correctly in the bar. */
+  .nav-links a.btn{color:#1a1206;text-shadow:0 1px 0 rgba(255,255,255,.18);
+    padding:.72rem 1.35rem;font-size:.72rem;letter-spacing:.16em;margin-left:.6rem}
   .nav-links a.btn:hover{color:#120c04}
+  .nav-links a.btn::after{content:"";position:absolute;top:0;left:-120%;bottom:auto;
+    width:60%;height:100%;border-radius:0;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+    transform:skewX(-18deg);animation:sweep 4.5s ease-in-out infinite;transition:none}
+  .nav-links a.btn:hover::after{width:60%}
+  header.scrolled .nav-links a.btn{padding:.62rem 1.2rem}
+  @media (prefers-reduced-motion:reduce){.nav-links a.btn::after{animation:none}}
   /* mobile menu scrim + scroll lock */
   .nav-scrim{position:fixed;inset:0;background:rgba(5,4,3,.62);backdrop-filter:blur(3px);
     opacity:0;visibility:hidden;transition:opacity .35s ease,visibility .35s;z-index:1090}
@@ -393,7 +404,9 @@
     .nav-links a::after{display:none}
     .nav-links a:active{color:var(--bronze-lt)}
     .nav-links li:last-child{margin-top:1.2rem;border:none}
-    .nav-links .btn{width:100%;justify-content:center;border-bottom:none;color:#1a1206;font-size:.82rem;padding:1.05rem}
+    .nav-links a.btn{width:100%;justify-content:center;border-bottom:none;color:#1a1206;
+      font-size:.82rem;letter-spacing:.15em;padding:1.05rem;margin-left:0}
+    header.scrolled .nav-links a.btn{padding:1.05rem}
     .burger{display:flex}
     .burger.x span:nth-child(1){transform:translateY(7px) rotate(45deg)}
     .burger.x span:nth-child(2){opacity:0}
