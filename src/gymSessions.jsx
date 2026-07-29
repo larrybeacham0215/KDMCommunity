@@ -68,6 +68,16 @@ const Sub = ({ children }) => (
     textTransform: "uppercase", color: T.muted2, margin: "26px 0 12px" }}>{children}</div>
 );
 
+/* Field wrapper. MUST live at module scope — defining a component inside a
+   render function gives it a new identity on every keystroke, which makes
+   React unmount and remount the input underneath it and drop the caret. That
+   is exactly the "I can only type one character" bug. */
+const L = ({ label, children, full }) => (
+  <div style={{ gridColumn: full ? "1 / -1" : "auto" }}>
+    <Field label={label} />{children}
+  </div>
+);
+
 function CopyBtn({ value, label = "Copy link" }) {
   const [done, setDone] = useState(false);
   return (
@@ -103,10 +113,16 @@ function SessionCard({ m, onOpen }) {
   );
 }
 
+const SessionGrid = ({ items, onOpen }) => (
+  <div style={{ display: "grid", gap: 14,
+    gridTemplateColumns: "repeat(auto-fill,minmax(238px,1fr))" }}>
+    {items.map(m => <SessionCard key={m.id} m={m} onOpen={x => onOpen(x.id)} />)}
+  </div>
+);
+
 /* ===========================================================================
    PROPOSE A WORKOUT
    ========================================================================= */
-
 const BLANK = {
   title: "", description: "", scheduled_at: toLocalInput(), duration_minutes: 60,
   cover_key: "iron", join_url: DEFAULT_JOIN_URL, focus_verses: "", discussion_questions: "",
@@ -128,12 +144,6 @@ function ProposeForm({ user, profile, onDone, onCancel }) {
     if (error) { setErr(error.message); return; }
     onDone(data);
   };
-
-  const L = ({ label, children, full }) => (
-    <div style={{ gridColumn: full ? "1 / -1" : "auto" }}>
-      <Field label={label} />{children}
-    </div>
-  );
 
   return (
     <Wrap w={860}>
@@ -511,12 +521,6 @@ export function GymSessions({ user, profile }) {
   const mine    = rows.filter(r => r.created_by === user.id && ["draft", "rejected"].includes(r.status));
   const approver = isApprover(profile);
 
-  const Grid = ({ items }) => (
-    <div style={{ display: "grid", gap: 14,
-      gridTemplateColumns: "repeat(auto-fill,minmax(238px,1fr))" }}>
-      {items.map(m => <SessionCard key={m.id} m={m} onOpen={x => setOpenId(x.id)} />)}
-    </div>
-  );
 
   return (
     <Wrap>
@@ -534,12 +538,12 @@ export function GymSessions({ user, profile }) {
         <>
           {approver && pending.length > 0 && (<>
             <Sub>Waiting on your keys · {pending.length}</Sub>
-            <Grid items={pending} />
+            <SessionGrid items={pending} onOpen={setOpenId} />
           </>)}
 
           {mine.length > 0 && (<>
             <Sub>Yours to finish</Sub>
-            <Grid items={mine} />
+            <SessionGrid items={mine} onOpen={setOpenId} />
           </>)}
 
           <Sub>Open workouts</Sub>
@@ -553,7 +557,7 @@ export function GymSessions({ user, profile }) {
               </p>
               <Btn onClick={() => setMode("propose")}><Plus size={15} /> Start a workout</Btn>
             </Card>
-          ) : <Grid items={open} />}
+          ) : <SessionGrid items={open} onOpen={setOpenId} />}
         </>
       )}
     </Wrap>
