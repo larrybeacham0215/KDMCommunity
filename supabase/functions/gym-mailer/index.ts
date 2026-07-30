@@ -22,6 +22,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SITE = "https://kdmcommunity.com";
 const APP = `${SITE}/app/`;
 const FROM = { email: "welcome@kdmcommunity.com", name: "Kingdom of Disciplined Men" };
+// welcome@ is send-only — kdmcommunity.com has no MX records, so anything sent
+// back to it disappears silently. Point replies at a mailbox that exists.
+const REPLY_TO = { email: "larrybeacham@gmail.com", name: "Larry Beacham" };
 
 // The Scripture Gym room. Read live from scripture_gym_content.gym_join_url on
 // every invocation (see resolveRoom below) so changing the link in the database
@@ -327,6 +330,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           sender: FROM,
+          replyTo: REPLY_TO,
           to: [{ email: row.recipient_email, name: row.recipient_name || undefined }],
           subject,
           htmlContent: html,
