@@ -300,6 +300,44 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
+
+    const db = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // AUTHORISATION. This function drains the mail queue and can report who
+    // received what. A plain member token used to be enough to call it — any
+    // signed-in man could force a send or probe another man's mail history.
+    // Only the service role (cron) or a Super Admin may call it now.
+    {
+      const auth = req.headers.get("authorization") ?? "";
+      const token = auth.replace(/^Bearer\s+/i, "");
+      let allowed = token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+      // The cron job authenticates with the legacy service_role JWT, which is
+      // not always byte-identical to the injected env var. Trust the token's
+      // own role claim instead of comparing strings.
+      if (!allowed && token.startsWith("eyJ")) {
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payload?.role === "service_role") allowed = true;
+        } catch { /* not a readable JWT */ }
+      }
+
+      if (!allowed && token) {
+        const { data: u } = await db.auth.getUser(token);
+        if (u?.user?.id) {
+          const { data: prof } = await db
+            .from("profiles").select("role").eq("id", u.user.id).maybeSingle();
+          allowed = prof?.role === "owner";
+        }
+      }
+      if (!allowed) {
+        return json({ ok: false, error: "Not authorised." }, 403);
+      }
+    }
+
     const dryRun = body.dry_run === true;
 
     // { "probe": "someone@example.com" } -> what Brevo actually did with his
@@ -333,10 +371,6 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    const db = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     // One read, one source of truth, shared by every template in this batch.
     const { data: roomRow } = await db
