@@ -45,6 +45,23 @@ const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"]/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 
+// How far out the session actually is, in hours. Reminders phrase themselves
+// from this instead of assuming the queue drained on schedule — a reminder
+// queued for "24h before" can sit past-due and go out the same afternoon.
+const hoursUntil = (iso?: string): number | null => {
+  if (!iso) return null;
+  return (new Date(iso).getTime() - Date.now()) / 3_600_000;
+};
+
+// "Tomorrow" is only true if it is actually tomorrow.
+const lead = (h: number | null) => {
+  if (h === null) return { word: "Coming up", sentence: "is coming up" };
+  if (h >= 20)   return { word: "Tomorrow",  sentence: "is tomorrow" };
+  if (h >= 5)    return { word: "Today",     sentence: "is today" };
+  if (h >= 1.5)  return { word: "In a few hours", sentence: "starts in a few hours" };
+  return { word: "Starting soon", sentence: "starts shortly" };
+};
+
 const when = (iso?: string) => {
   if (!iso) return "Date to be announced";
   return new Date(iso).toLocaleString("en-US", {
@@ -168,22 +185,30 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     ].join(""), { label: "Open the meeting", url: String(m.join_url || d.join_url || ROOM) }),
   }),
 
-  reminder_24h: ({ d, m, name }) => ({
-    subject: `Tomorrow: ${d.title}`,
-    html: shell("Tomorrow", [
-      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> is tomorrow.`),
-      detail("When", when(m.scheduled_at as string)),
-      questions(m.discussion_questions as string),
-    ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
-  }),
+  reminder_24h: ({ d, m, name }) => {
+    const l = lead(hoursUntil(m.scheduled_at as string));
+    return {
+      subject: `${l.word}: ${d.title}`,
+      html: shell(l.word, [
+        p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${l.sentence}.`),
+        detail("When", when(m.scheduled_at as string)),
+        questions(m.discussion_questions as string),
+      ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
+    };
+  },
 
-  reminder_1h: ({ d, m }) => ({
-    subject: `One hour: ${d.title}`,
-    html: shell("One hour out", [
-      p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong> starts in an hour.`),
-      p("Bring something to write with."),
-    ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
-  }),
+  reminder_1h: ({ d, m }) => {
+    const h = hoursUntil(m.scheduled_at as string);
+    const soon = h !== null && h < 0.75;
+    return {
+      subject: soon ? `Starting now: ${d.title}` : `One hour: ${d.title}`,
+      html: shell(soon ? "Starting now" : "One hour out", [
+        p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${soon ? "is starting" : "starts in an hour"}.`),
+        detail("Starts", when(m.scheduled_at as string)),
+        p("Bring something to write with."),
+      ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
+    };
+  },
 
   meeting_cancelled: ({ d, name }) => ({
     subject: `Cancelled: ${d.title}`,
@@ -302,6 +327,20 @@ Deno.serve(async (req) => {
           skipped++;
           await db.from("gym_notifications")
             .update({ status: "skipped", error: "Session already passed or was called off" })
+            .eq("id", row.id);
+          continue;
+        }
+
+        // Someone who registers inside the 24h window gets a day-before
+        // reminder that is already past due, so it goes out immediately —
+        // landing minutes after their confirmation and, before this, saying
+        // "Tomorrow" about something happening that evening. The confirmation
+        // already carries the date; the 1h reminder still fires. Retire it.
+        const h = hoursUntil(m.scheduled_at as string);
+        if (row.template_key === "reminder_24h" && h !== null && h < 20) {
+          skipped++;
+          await db.from("gym_notifications")
+            .update({ status: "skipped", error: "Registered inside 24h — confirmation already covered it" })
             .eq("id", row.id);
           continue;
         }
