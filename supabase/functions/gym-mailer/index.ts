@@ -185,6 +185,30 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     ].join(""), { label: "Open the meeting", url: String(m.join_url || d.join_url || ROOM) }),
   }),
 
+  reminder_7d: ({ d, m, name }) => {
+    const h = hoursUntil(m.scheduled_at as string);
+    const days = h === null ? null : Math.round(h / 24);
+    return {
+      subject: `${days !== null && days <= 1 ? "Coming up" : `${days} days out`}: ${d.title}`,
+      html: shell("On the calendar", [
+        p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> is ${days !== null && days <= 1 ? "almost here" : `${days} days out`}.`),
+        detail("When", when(m.scheduled_at as string)),
+        m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
+        p("Far enough out to move what needs moving. Put it in your calendar now."),
+      ].join(""), { label: "See the session", url: `${APP}?share=${m.share_slug}` }),
+    };
+  },
+
+  meeting_rescheduled: ({ d, m, name }) => ({
+    subject: `New time: ${d.title}`,
+    html: shell("The time has moved", [
+      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been rescheduled. Your seat is still yours — nothing to do but note the new time.`),
+      detail("Was", when(d.old_time as string)),
+      detail("Now", when((d.new_time || m.scheduled_at) as string)),
+      p("Your reminders have already been moved with it."),
+    ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
+  }),
+
   reminder_24h: ({ d, m, name }) => {
     const l = lead(hoursUntil(m.scheduled_at as string));
     return {
@@ -337,6 +361,13 @@ Deno.serve(async (req) => {
         // "Tomorrow" about something happening that evening. The confirmation
         // already carries the date; the 1h reminder still fires. Retire it.
         const h = hoursUntil(m.scheduled_at as string);
+        if (row.template_key === "reminder_7d" && h !== null && h < 120) {
+          skipped++;
+          await db.from("gym_notifications")
+            .update({ status: "skipped", error: "Too close to the session for a week-out notice" })
+            .eq("id", row.id);
+          continue;
+        }
         if (row.template_key === "reminder_24h" && h !== null && h < 20) {
           skipped++;
           await db.from("gym_notifications")
