@@ -263,7 +263,12 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   welcome_member: ({ name }) => ({
     subject: "Welcome to the Kingdom",
     html: shell("Welcome, brother", [
-      p(`${esc(name || "Brother")}, you're in. Your account is active — no link to click, nothing to verify.`),
+      // Do NOT claim the account is already active here. Signup confirmation
+      // is ON (mailer_autoconfirm=false), so a separate Supabase email carries
+      // the link he must click. Telling him there is nothing to verify is how
+      // a man ends up locked out believing he is already in.
+      p(`${esc(name || "Brother")}, you're in. One thing first: check your inbox for a separate email titled "Welcome to the Kingdom — confirm your account" and click the button inside. That switches your account on.`),
+      p(`If it isn't there in a few minutes, look in spam — the first message from a new address often lands there. Mark it "not spam" and the rest will come straight through.`),
       p("The Scripture Gym is where the work happens: live sessions with other men, verses to train on, and the discipline of showing up when you don't feel like it."),
       p(`<em style="color:#c8862e;">"A disciplined man builds a home where his whole family can thrive."</em>`),
     ].join(""), { label: "Enter the Forge", url: APP }),
