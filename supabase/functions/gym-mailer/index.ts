@@ -290,6 +290,28 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true;
+
+    // { "probe": "someone@example.com" } -> what Brevo actually did with his
+    // mail. Answers the only question that matters when a man says he never
+    // got it: accepted-but-bounced, filtered as spam, or never sent at all.
+    if (typeof body.probe === "string" && body.probe) {
+      const key = Deno.env.get("BREVO_API_KEY");
+      if (!key) return json({ ok: false, error: "BREVO_API_KEY is not set." }, 400);
+      const acct = await fetch("https://api.brevo.com/v3/account", { headers: { "api-key": key } });
+      const ev = await fetch(
+        `https://api.brevo.com/v3/smtp/statistics/events?email=${encodeURIComponent(body.probe)}&limit=50`,
+        { headers: { "api-key": key } });
+      const events = ev.ok ? (await ev.json())?.events ?? [] : [];
+      return json({
+        ok: true,
+        probe: body.probe,
+        brevo_reachable: acct.ok,
+        event_count: events.length,
+        events: events.map((e: Record<string, unknown>) => ({
+          event: e.event, date: e.date, subject: e.subject, reason: e.reason,
+        })),
+      });
+    }
     const limit = Math.min(Number(body.limit) || 50, 200);
 
     const apiKey = Deno.env.get("BREVO_API_KEY");
@@ -414,8 +436,18 @@ Deno.serve(async (req) => {
 
       if (res.ok) {
         sent++;
+        // Brevo returns a messageId. Keep it: "sent" means Brevo ACCEPTED the
+        // message, not that it landed. Without this there is no way to trace
+        // a message that bounced or was filtered after acceptance.
+        let messageId: string | null = null;
+        try { messageId = (await res.clone().json())?.messageId ?? null; } catch { /* non-JSON */ }
         await db.from("gym_notifications")
-          .update({ status: "sent", sent_at: new Date().toISOString(), error: null })
+          .update({
+            status: "sent",
+            sent_at: new Date().toISOString(),
+            error: null,
+            payload: { ...(row.payload as Record<string, unknown> ?? {}), brevo_message_id: messageId },
+          })
           .eq("id", row.id);
       } else {
         failed++;
