@@ -185,6 +185,17 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     ].join(""), { label: "Open the meeting", url: String(m.join_url || d.join_url || ROOM) }),
   }),
 
+  weekly_open_gym: ({ d, m, name }) => ({
+    subject: `This Wednesday: ${d.title}`,
+    html: shell("This week at the gym", [
+      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> meets this week. Same room, same time, every week.`),
+      detail("When", when((d.scheduled_at || m.scheduled_at) as string)),
+      m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
+      questions(m.discussion_questions as string),
+      p("You don't need to be ready. You need to be there."),
+    ].join(""), { label: "Join the room", url: String(d.join_url || m.join_url || ROOM) }),
+  }),
+
   reminder_7d: ({ d, m, name }) => {
     const h = hoursUntil(m.scheduled_at as string);
     const days = h === null ? null : Math.round(h / 24);
