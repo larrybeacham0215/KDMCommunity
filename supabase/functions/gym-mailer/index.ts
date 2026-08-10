@@ -62,6 +62,14 @@ const lead = (h: number | null) => {
   return { word: "Starting soon", sentence: "starts shortly" };
 };
 
+// Day name from the meeting itself — never hardcode a weekday in a subject line.
+const dayName = (iso?: string) => {
+  if (!iso) return "This week";
+  return "This " + new Date(iso).toLocaleDateString("en-US", {
+    weekday: "long", timeZone: "America/New_York",
+  });
+};
+
 const when = (iso?: string) => {
   if (!iso) return "Date to be announced";
   return new Date(iso).toLocaleString("en-US", {
@@ -185,8 +193,18 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     ].join(""), { label: "Open the meeting", url: String(m.join_url || d.join_url || ROOM) }),
   }),
 
+  schedule_correction: ({ d, m, name }) => ({
+    subject: `Correction: Scripture Gym is MONDAY, not Wednesday`,
+    html: shell("We got the day wrong", [
+      p(`${esc(name || "Brother")}, an earlier email said Open Gym meets Wednesday. That was our mistake. Scripture Gym meets <strong style="color:#f7f1e6;">Monday at 7:00 PM ET</strong> \u2014 every week.`),
+      detail("Next session", when((d.scheduled_at || m.scheduled_at) as string)),
+      p("Apologies for the confusion. The schedule in the app and every future reminder now say Monday."),
+      p("You don't need to be ready. You need to be there."),
+    ].join(""), { label: "Join the room", url: String(d.join_url || m.join_url || ROOM) }),
+  }),
+
   weekly_open_gym: ({ d, m, name }) => ({
-    subject: `This Wednesday: ${d.title}`,
+    subject: `${dayName((d.scheduled_at || m.scheduled_at) as string)}: ${d.title}`,
     html: shell("This week at the gym", [
       p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> meets this week. Same room, same time, every week.`),
       detail("When", when((d.scheduled_at || m.scheduled_at) as string)),
