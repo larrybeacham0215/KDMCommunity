@@ -62,6 +62,32 @@ const lead = (h: number | null) => {
   return { word: "Starting soon", sentence: "starts shortly" };
 };
 
+// Greetings use the first name only: "Larry Beacham," reads like a form letter,
+// "Larry," reads like a man talking to a man. Handles the odd cases a roster
+// collects — extra spaces, an email in the name field, a lone initial.
+const firstName = (full?: string) => {
+  const raw = String(full ?? "").trim();
+  if (!raw) return "";
+  if (raw.includes("@")) return "";                        // an email, not a name
+  const parts = raw.replace(/,+$/, "").split(/\s+/)
+    // drop leading titles so we don't greet a man as "Dr."
+    .filter((w, i) => !(i === 0 && /^(mr|mrs|ms|dr|pastor|rev|sr|fr|bro|coach)\.?$/i.test(w)));
+  if (!parts.length) return "";
+  // Initials given as separate letters ("J J") read as one name.
+  if (parts.every((w) => w.replace(/\./g, "").length === 1)) {
+    return parts.map((w) => w.replace(/\./g, "").toUpperCase()).join("");
+  }
+  const first = parts[0].replace(/,+$/, "");
+  // Preserve intentional casing (McQueen, JJ); only fix ALL CAPS or all lower.
+  if (first.length > 3 && first === first.toUpperCase()) {
+    return first[0] + first.slice(1).toLowerCase();
+  }
+  if (first === first.toLowerCase()) {
+    return first[0].toUpperCase() + first.slice(1);
+  }
+  return first;
+};
+
 // Day name from the meeting itself — never hardcode a weekday in a subject line.
 const dayName = (iso?: string) => {
   if (!iso) return "This week";
@@ -129,7 +155,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   meeting_submitted_creator: ({ d, name }) => ({
     subject: `Received: ${d.title}`,
     html: shell("We've got it", [
-      p(`${esc(name || "Brother")}, your workout <strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been submitted.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}your workout <strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been submitted.`),
       p("Nothing else is needed from you. It's with Larry for the keys — you'll hear the moment it's cleared."),
     ].join("")),
   }),
@@ -146,7 +172,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   meeting_approved_creator: ({ d, m, name }) => ({
     subject: `Cleared: ${d.title}`,
     html: shell("You're cleared", [
-      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> is approved and open to the men.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> is approved and open to the men.`),
       detail("When", when(m.scheduled_at as string)),
       p("Share this link anywhere — it works for people who don't have an account."),
     ].join(""), { label: "Open the workout", url: `${APP}?share=${d.share_slug ?? m.share_slug}` }),
@@ -155,7 +181,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   meeting_rejected_creator: ({ d, name }) => ({
     subject: `Sent back: ${d.title}`,
     html: shell("Not this one — yet", [
-      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> wasn't cleared.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> wasn't cleared.`),
       d.reason ? detail("What to fix", String(d.reason)) : "",
       p("Adjust it and submit again. This isn't a no, it's a not like this."),
     ].join(""), { label: "Open the gym", url: APP }),
@@ -183,7 +209,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   registration_confirmed: ({ d, m, name }) => ({
     subject: `Your seat is saved: ${d.title}`,
     html: shell("Your seat is saved", [
-      p(`${esc(name || "Brother")}, you're in for <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}you're in for <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
       detail("When", when((d.scheduled_at || m.scheduled_at) as string)),
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       questions(m.discussion_questions as string),
@@ -196,7 +222,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   schedule_correction: ({ d, m, name }) => ({
     subject: `Correction: Scripture Gym is MONDAY, not Wednesday`,
     html: shell("We got the day wrong", [
-      p(`${esc(name || "Brother")}, an earlier email said Open Gym meets Wednesday. That was our mistake. Scripture Gym meets <strong style="color:#f7f1e6;">Monday at 7:00 PM ET</strong> \u2014 every week.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}an earlier email said Open Gym meets Wednesday. That was our mistake. Scripture Gym meets <strong style="color:#f7f1e6;">Monday at 7:00 PM ET</strong> \u2014 every week.`),
       detail("Next session", when((d.scheduled_at || m.scheduled_at) as string)),
       p("Apologies for the confusion. The schedule in the app and every future reminder now say Monday."),
       p("You don't need to be ready. You need to be there."),
@@ -206,7 +232,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   weekly_open_gym: ({ d, m, name }) => ({
     subject: `${dayName((d.scheduled_at || m.scheduled_at) as string)}: ${d.title}`,
     html: shell("This week at the gym", [
-      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> meets this week. Same room, same time, every week.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> meets this week. Same room, same time, every week.`),
       detail("When", when((d.scheduled_at || m.scheduled_at) as string)),
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       questions(m.discussion_questions as string),
@@ -220,7 +246,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     return {
       subject: `${days !== null && days <= 1 ? "Coming up" : `${days} days out`}: ${d.title}`,
       html: shell("On the calendar", [
-        p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> is ${days !== null && days <= 1 ? "almost here" : `${days} days out`}.`),
+        p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> is ${days !== null && days <= 1 ? "almost here" : `${days} days out`}.`),
         detail("When", when(m.scheduled_at as string)),
         m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
         p("Far enough out to move what needs moving. Put it in your calendar now."),
@@ -231,7 +257,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   meeting_rescheduled: ({ d, m, name }) => ({
     subject: `New time: ${d.title}`,
     html: shell("The time has moved", [
-      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been rescheduled. Your seat is still yours — nothing to do but note the new time.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been rescheduled. Your seat is still yours — nothing to do but note the new time.`),
       detail("Was", when(d.old_time as string)),
       detail("Now", when((d.new_time || m.scheduled_at) as string)),
       p("Your reminders have already been moved with it."),
@@ -243,7 +269,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     return {
       subject: `${l.word}: ${d.title}`,
       html: shell(l.word, [
-        p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${l.sentence}.`),
+        p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${l.sentence}.`),
         detail("When", when(m.scheduled_at as string)),
         questions(m.discussion_questions as string),
       ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
@@ -266,7 +292,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   meeting_cancelled: ({ d, name }) => ({
     subject: `Cancelled: ${d.title}`,
     html: shell("This one's been called off", [
-      p(`${esc(name || "Brother")}, <strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been cancelled.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been cancelled.`),
       p("Nothing is required from you. Watch for the next one."),
     ].join(""), { label: "See what's open", url: APP }),
   }),
@@ -274,7 +300,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   meeting_completed_followup: ({ d, m, name }) => ({
     subject: `Recap: ${d.title}`,
     html: shell("In the books", [
-      p(`${esc(name || "Brother")}, thank you for showing up to <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}thank you for showing up to <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
       m.notes ? detail("Notes", String(m.notes)) : "",
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       p("The work continues where nobody's watching."),
@@ -284,7 +310,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   gym_invite: ({ d, name }) => ({
     subject: "You've been called into the Scripture Gym",
     html: shell("You've been called in", [
-      p(`${esc(name || "Brother")}, ${esc(d.invited_by_name || "a brother")} invited you into the Scripture Gym.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}${esc(d.invited_by_name || "a brother")} invited you into the Scripture Gym.`),
       p("It's where the men train the Word like iron — live sessions, honest rooms, and the discipline of showing up."),
     ].join(""), { label: "Step in", url: APP }),
   }),
@@ -296,7 +322,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       // is ON (mailer_autoconfirm=false), so a separate Supabase email carries
       // the link he must click. Telling him there is nothing to verify is how
       // a man ends up locked out believing he is already in.
-      p(`${esc(name || "Brother")}, you're in. One thing first: check your inbox for a separate email titled "Welcome to the Kingdom — confirm your account" and click the button inside. That switches your account on.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}you're in. One thing first: check your inbox for a separate email titled "Welcome to the Kingdom — confirm your account" and click the button inside. That switches your account on.`),
       p(`If it isn't there in a few minutes, look in spam — the first message from a new address often lands there. Mark it "not spam" and the rest will come straight through.`),
       p("The Scripture Gym is where the work happens: live sessions with other men, verses to train on, and the discipline of showing up when you don't feel like it."),
       p(`<em style="color:#c8862e;">"A disciplined man builds a home where his whole family can thrive."</em>`),
@@ -470,7 +496,7 @@ Deno.serve(async (req) => {
       const { subject, html } = tpl({
         d: row.payload ?? {},
         m: m as Record<string, unknown>,
-        name: row.recipient_name ?? "",
+        name: firstName(row.recipient_name),   // first name only — see firstName()
       });
 
       if (dryRun) {
