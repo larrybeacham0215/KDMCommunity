@@ -3,7 +3,7 @@ import {
   Menu, X, Flame, ShieldCheck, BookOpen, CalendarCheck, Compass,
   Video, Upload, Square, Play, ChevronRight, ChevronDown, LogOut, User,
   CheckCircle2, Circle, Quote, ArrowRight, Lock, Mail, NotebookPen, Target,
-  Server, Dumbbell
+  Server, Dumbbell, LibraryBig, ExternalLink
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Crest, Eyebrow, Btn, Card } from "./ui";
@@ -212,7 +212,11 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
       { id: "p90", label: "90-Day Curriculum", icon: BookOpen },
       { id: "checkin", label: "Daily Check-In", icon: CalendarCheck },
     ] : []),
-    { id: "profile", label: "My Profile", icon: User },
+  ];
+  // Outside links and member perks. Its own section so it doesn't read as
+  // another part of the program.
+  const resourceItems = [
+    { id: "resources", label: "RightNow Media", icon: LibraryBig },
   ];
   const navBtn = (it, opts = {}) => {
     const active = view === it.id;
@@ -259,6 +263,10 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
 
         <nav style={{ padding: 12, flex: 1, overflowY: "auto" }}>
           {items.map(it => navBtn(it))}
+
+          {sectionLabel("Resources")}
+          {resourceItems.map(it => navBtn(it))}
+          {navBtn({ id: "profile", label: "My Profile", icon: User })}
 
           {showCommand && (
             <>
@@ -848,6 +856,95 @@ function CheckIn({ checkins, addCheckin, onStreak }) {
 /* ============================================================================
    PROFILE
    ========================================================================== */
+/* ===========================================================================
+   RESOURCES — outside tools the men get through the Kingdom
+   ========================================================================= */
+const RIGHTNOW_JOIN = "https://app.rightnowmedia.org/en/join/GraceFamilyChurch";
+
+function Resources() {
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto" }}>
+      <Eyebrow>Resources</Eyebrow>
+      <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 6px" }}>
+        What's available to you
+      </h2>
+      <p style={{ fontFamily: T.body, color: T.muted, fontSize: 15, lineHeight: 1.6, marginTop: 0, marginBottom: 22, maxWidth: "62ch" }}>
+        Tools and libraries the Kingdom has opened up for the men. Free to you — no card, no catch.
+      </p>
+
+      <Card pad={0} style={{ overflow: "hidden" }}>
+        <div style={{
+          padding: "26px 24px 22px",
+          background: "linear-gradient(135deg, rgba(200,134,46,.10), transparent 70%)",
+          borderBottom: `1px solid ${T.lineSoft}`,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 3, flex: "0 0 auto",
+              border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(200,134,46,.10)",
+            }}><LibraryBig size={21} color={T.bronzeLt} /></div>
+            <div>
+              <div style={{ fontFamily: T.display, fontSize: 21, color: T.cream, lineHeight: 1.1 }}>
+                RightNow Media
+              </div>
+              <div style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".18em",
+                textTransform: "uppercase", color: T.bronze, marginTop: 4 }}>
+                Sponsored by Grace Family Church
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontFamily: T.body, fontSize: 15, lineHeight: 1.65, color: T.cream, margin: "0 0 12px" }}>
+            Think of it as the Netflix of Bible study — a streaming library of more than
+            25,000 video studies you can watch on your phone, tablet, computer, or TV.
+          </p>
+          <p style={{ fontFamily: T.body, fontSize: 14.5, lineHeight: 1.65, color: T.muted, margin: 0 }}>
+            Series on marriage, fatherhood, leadership, finances, and recovery, taught by
+            voices like Tony Evans, Francis Chan, and John Maxwell — plus safe shows for the
+            kids. Use it for your own morning time, or run a series with the men in your
+            cohort. Downloads work offline, so it travels with you.
+          </p>
+        </div>
+
+        <div style={{ padding: "20px 24px 24px" }}>
+          <div style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".2em",
+            textTransform: "uppercase", color: T.muted2, marginBottom: 10 }}>
+            How to get in
+          </div>
+          <p style={{ fontFamily: T.body, fontSize: 14.5, lineHeight: 1.6, color: T.muted, margin: "0 0 18px" }}>
+            RightNow Media isn't sold to individuals — you get it through a church.
+            Grace Family Church covers this one, so it costs you nothing. Tap below,
+            create your free account, and the whole library opens up.
+          </p>
+
+          <a
+            href={RIGHTNOW_JOIN}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
+              background: T.gold, color: "#1a1206", textDecoration: "none",
+              fontFamily: T.reg, fontSize: 13, fontWeight: 700, letterSpacing: ".1em",
+              textTransform: "uppercase", padding: "15px 30px", borderRadius: 3,
+              minHeight: 48, boxSizing: "border-box",
+            }}
+          >
+            Claim your free access <ExternalLink size={15} />
+          </a>
+
+          <p style={{ fontFamily: T.body, fontSize: 12.5, lineHeight: 1.55, color: T.muted2, margin: "16px 0 0", wordBreak: "break-all" }}>
+            Or paste this into your browser:{" "}
+            <a href={RIGHTNOW_JOIN} target="_blank" rel="noopener noreferrer" style={{ color: T.bronze }}>
+              {RIGHTNOW_JOIN}
+            </a>
+          </p>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function Profile({ user, streak, checkins }) {
   return (
     <div style={{ maxWidth: 620, margin: "0 auto" }}>
@@ -955,7 +1052,7 @@ export default function App() {
   // programs and Daily Check-In as well as the Command section.
   const staff = isOwner && !previewMember;
   const STAFF_ONLY_VIEWS = ["p30", "p90", "checkin"];
-  const titles = { dashboard: "The Forge", scripturegym: "Scripture Gym", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", ...ADMIN_TITLES };
+  const titles = { dashboard: "The Forge", scripturegym: "Scripture Gym", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", resources: "Resources", ...ADMIN_TITLES };
 
   const togglePreview = () => {
     setPreviewMember(p => {
@@ -1036,6 +1133,7 @@ export default function App() {
           </div>
         )}
         {view === "profile" && <Profile user={user} streak={streak} checkins={checkins} />}
+        {view === "resources" && <Resources />}
 
         {/* Owner Command + Systems (UI gate; RLS enforces at the DB regardless) */}
         {isOwner && !previewMember && (view.startsWith("admin_") || view === "gideon") && <AdminScreen view={view} profile={profile} />}
