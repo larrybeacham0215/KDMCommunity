@@ -41,6 +41,17 @@ const cors = {
    Presentation
    ------------------------------------------------------------------------- */
 
+// Every email closes the same way. A man should know who it came from without
+// checking the header — that is what makes it a letter and not a notification.
+const SIGNATURE = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;border-top:1px solid rgba(216,168,92,.14);">
+      <tr><td style="padding-top:20px;">
+        <p style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-style:italic;color:#c8862e;">Go forth in victory!</p>
+        <p style="margin:0;font-size:15px;color:#f7f1e6;font-family:Georgia,'Times New Roman',serif;">Larry Beacham</p>
+        <p style="margin:2px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#8a7f6d;">Founder, Kingdom of Disciplined Men</p>
+      </td></tr>
+    </table>`;
+
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"]/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -126,6 +137,7 @@ function shell(heading: string, blocks: string, cta?: { label: string; url: stri
     </table>
     <p style="margin:0 0 6px;font-size:12.5px;color:#6e6557;">If the button doesn't work, paste this into your browser:</p>
     <p style="margin:0 0 8px;font-size:12.5px;word-break:break-all;"><a href="${cta.url}" style="color:#c8862e;">${cta.url}</a></p>` : ""}
+    ${SIGNATURE}
   </td></tr>
   <tr><td style="padding:20px 40px 30px;border-top:1px solid rgba(216,168,92,.12);">
     <p style="margin:0;font-size:12px;color:#6e6557;font-family:Arial,Helvetica,sans-serif;">Kingdom of Disciplined Men · kdmcommunity.com</p>
@@ -159,6 +171,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     html: shell("We've got it", [
       p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}your workout <strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been submitted.`),
       p("Nothing else is needed from you. It's with Larry for the keys — you'll hear the moment it's cleared."),
+      p(`<strong style="color:#f7f1e6;">Good work putting this together, ${esc(name || "brother")}. I will look at it shortly.</strong>`),
     ].join("")),
   }),
 
@@ -168,6 +181,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong> was submitted by ${esc(d.submitted_by || "a member")}.`),
       detail("When", when(m.scheduled_at as string)),
       p("Approving opens it to the men and makes the join link live."),
+      p(`<strong style="color:#f7f1e6;">One decision from you and this opens to the men.</strong>`),
     ].join(""), { label: "Review it", url: APP }),
   }),
 
@@ -177,6 +191,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> is approved and open to the men.`),
       detail("When", when(m.scheduled_at as string)),
       p("Share this link anywhere — it works for people who don't have an account."),
+      p(`<strong style="color:#f7f1e6;">Now fill the room, ${esc(name || "brother")}. Send that link to one man today.</strong>`),
     ].join(""), { label: "Open the workout", url: `${APP}?share=${d.share_slug ?? m.share_slug}` }),
   }),
 
@@ -186,25 +201,28 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> wasn't cleared.`),
       d.reason ? detail("What to fix", String(d.reason)) : "",
       p("Adjust it and submit again. This isn't a no, it's a not like this."),
+      p(`<strong style="color:#f7f1e6;">This is not a no, ${esc(name || "brother")}. It is a not like this. Send it back to me.</strong>`),
     ].join(""), { label: "Open the gym", url: APP }),
   }),
 
-  manager_assigned: ({ d, m }) => ({
+  manager_assigned: ({ d, m, name }) => ({
     subject: `You're covering: ${d.title}`,
     html: shell("You've been asked to cover a session", [
       p(`You're the manager on <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
       detail("When", when(m.scheduled_at as string)),
       p("That means you're expected in the room, vouching for it."),
+      p(`<strong style="color:#f7f1e6;">Thank you for covering this one, ${esc(name || "brother")}. The men will feel it.</strong>`),
     ].join(""), { label: "See the session", url: APP }),
   }),
 
-  meeting_published_members: ({ d, m }) => ({
+  meeting_published_members: ({ d, m, name }) => ({
     subject: `New workout: ${d.title}`,
     html: shell("A new workout is open", [
       p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong>`),
       detail("When", when(m.scheduled_at as string)),
       m.description ? p(esc(m.description)) : "",
       p("Seats aren't limited, but showing up is."),
+      p(`<strong style="color:#f7f1e6;">Seats are not limited, ${esc(name || "brother")}. Showing up is.</strong>`),
     ].join(""), { label: "Save your seat", url: `${APP}?share=${m.share_slug}` }),
   }),
 
@@ -218,6 +236,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p("Come with one honest answer. That's the whole entry fee."),
     // Live meeting row wins over the payload: the payload is a snapshot taken
     // when the man registered, and the room can move between then and send.
+      p(`<strong style="color:#f7f1e6;">Come with one honest answer, ${esc(name || "brother")}. That is the whole entry fee.</strong>`),
     ].join(""), { label: "Open the meeting", url: String(m.join_url || d.join_url || ROOM) }),
   }),
 
@@ -228,6 +247,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       detail("Next session", when((d.scheduled_at || m.scheduled_at) as string)),
       p("Apologies for the confusion. The schedule in the app and every future reminder now say Monday."),
       p("You don't need to be ready. You need to be there."),
+      p(`<strong style="color:#f7f1e6;">Thank you for your patience, ${esc(name || "brother")}. See you Monday.</strong>`),
     ].join(""), { label: "Join the room", url: String(d.join_url || m.join_url || ROOM) }),
   }),
 
@@ -239,6 +259,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       questions(m.discussion_questions as string),
       p("You don't need to be ready. You need to be there."),
+      p(`<strong style="color:#f7f1e6;">Bring whatever this week has done to you, ${esc(name || "brother")}. That is what the room is for.</strong>`),
     ].join(""), { label: "Join the room", url: String(d.join_url || m.join_url || ROOM) }),
   }),
 
@@ -274,11 +295,12 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
         p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${l.sentence}.`),
         detail("When", when(m.scheduled_at as string)),
         questions(m.discussion_questions as string),
+        p(`<strong style="color:#f7f1e6;">Clear the night if you can, ${esc(name || "brother")}. It is worth the hour.</strong>`),
       ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
     };
   },
 
-  reminder_1h: ({ d, m }) => {
+  reminder_1h: ({ d, m, name }) => {
     const h = hoursUntil(m.scheduled_at as string);
     const soon = h !== null && h < 0.75;
     return {
@@ -287,6 +309,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
         p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${soon ? "is starting" : "starts in an hour"}.`),
         detail("Starts", when(m.scheduled_at as string)),
         p("Bring something to write with."),
+        p(`<strong style="color:#f7f1e6;">See you in there, ${esc(name || "brother")}.</strong>`),
       ].join(""), { label: "Join the room", url: String(m.join_url || ROOM) }),
     };
   },
@@ -296,6 +319,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     html: shell("This one's been called off", [
       p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been cancelled.`),
       p("Nothing is required from you. Watch for the next one."),
+      p(`<strong style="color:#f7f1e6;">Nothing is required from you, ${esc(name || "brother")}. Watch for the next one.</strong>`),
     ].join(""), { label: "See what's open", url: APP }),
   }),
 
@@ -306,6 +330,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       m.notes ? detail("Notes", String(m.notes)) : "",
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       p("The work continues where nobody's watching."),
+      p(`<strong style="color:#f7f1e6;">The work continues where nobody is watching, ${esc(name || "brother")}.</strong>`),
     ].join(""), { label: "What's next", url: APP }),
   }),
 
@@ -314,6 +339,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     html: shell("You've been called in", [
       p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}${esc(d.invited_by_name || "a brother")} invited you into the Scripture Gym.`),
       p("It's where the men train the Word like iron — live sessions, honest rooms, and the discipline of showing up."),
+      p(`<strong style="color:#f7f1e6;">The door is open, ${esc(name || "brother")}. Walk through it.</strong>`),
     ].join(""), { label: "Step in", url: APP }),
   }),
 
@@ -330,6 +356,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p("That's what the Scripture Gym is. Not a Bible trivia contest. A weight room for the only muscle that decides who you are when nobody's watching."),
       p("Verses are grouped into <strong style=\"color:#f7f1e6;\">muscle groups</strong> — marriage, fatherhood, temper, provision, integrity. You pick one. You train a few reps at a time."),
       p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> open the Scripture Gym and pick the muscle group that names your weakest area. Not your strongest. Your weakest."),
+      p(`<strong style="color:#f7f1e6;">Store it now, ${esc(name || "brother")}, so it is there when you need it.</strong>`),
     ].join(""), { label: "Open the Scripture Gym", url: APP }),
   }),
 
@@ -343,6 +370,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p("You don't have to talk. First-timers often don't, and nobody pushes. But most men find out fast that saying the true thing out loud, to men who won't flinch, does something no book does."),
       p("Come as you are. Come tired. Come from the car. Just come."),
       p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> put Monday 7:00 PM on your calendar right now, before you close this. Set it to repeat."),
+      p(`<strong style="color:#f7f1e6;">The room is better when you are in it, ${esc(name || "brother")}.</strong>`),
     ].join(""), { label: "See this week's session", url: APP }),
   }),
 
@@ -354,6 +382,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p("<strong style=\"color:#f7f1e6;\">The reading list.</strong> Start with <em>Disciplines of a Godly Man</em> if you want the foundation, or <em>Stand Firm</em> if you want the shorter, sharper hit."),
       p("You don't need all of it. You need one of it, actually finished."),
       p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> claim your RightNow Media access — two minutes — or order one book. One. Then close the tab and go be present with your people."),
+      p(`<strong style="color:#f7f1e6;">Take what has already been paid for, ${esc(name || "brother")}. It is yours.</strong>`),
     ].join(""), { label: "Open Resources", url: APP }),
   }),
 
@@ -367,6 +396,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p(`<em style="color:#c8862e;">"Let us not grow weary in well-doing, for in due time we will reap a harvest, if we do not give up." — Galatians 6:9</em>`),
       p("You will miss a Monday. You will drop a streak. That isn't failure, that's a rep you didn't get. Get the next one."),
       p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> mark one verse as memorized. Your first. Then show up Monday and tell a brother you did it."),
+      p(`<strong style="color:#f7f1e6;">Consistency is the whole game, ${esc(name || "brother")}. Start your count today.</strong>`),
     ].join(""), { label: "Train a verse", url: APP }),
   }),
 
@@ -381,6 +411,7 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p(`If it isn't there in a few minutes, look in spam — the first message from a new address often lands there. Mark it "not spam" and the rest will come straight through.`),
       p("The Scripture Gym is where the work happens: live sessions with other men, verses to train on, and the discipline of showing up when you don't feel like it."),
       p(`<em style="color:#c8862e;">"A disciplined man builds a home where his whole family can thrive."</em>`),
+      p(`<strong style="color:#f7f1e6;">You did not find this room by accident, ${esc(name || "brother")}. Step in.</strong>`),
     ].join(""), { label: "Enter the Forge", url: APP }),
   }),
 };
@@ -558,7 +589,9 @@ Deno.serve(async (req) => {
         // Where the button actually points — the thing most worth checking
         // before a batch goes out.
         const cta = html.match(/color:#c8862e;">(https?:\/\/[^<]+)<\/a>/)?.[1] ?? null;
-        preview.push({ to: row.recipient_email, template: row.template_key, subject, cta });
+        preview.push({ to: row.recipient_email, template: row.template_key, subject, cta,
+          hasName: /Larry/.test(html), hasSig: /Go forth in victory/.test(html),
+          hasFounder: /Founder, Kingdom of Disciplined Men/.test(html) });
         continue;
       }
 
