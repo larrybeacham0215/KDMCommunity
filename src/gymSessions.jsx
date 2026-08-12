@@ -9,6 +9,7 @@ import {
   createMeeting, updateMeeting, approveMeeting, rejectMeeting, cancelMeeting,
   completeMeeting, createInvite, getSharedMeeting, registerForMeeting,
   shareUrl, joinUrl, canPublishDirectly, isApprover, fmtWhen, isPast, toLocalInput,
+  fetchCurriculumVerses,
   DEFAULT_JOIN_URL, fetchJoinUrl,
 } from "./gymSessionsData";
 
@@ -126,6 +127,7 @@ const SessionGrid = ({ items, onOpen }) => (
 const BLANK = {
   title: "", description: "", scheduled_at: toLocalInput(), duration_minutes: 60,
   cover_key: "iron", join_url: DEFAULT_JOIN_URL, focus_verses: "", discussion_questions: "",
+  memory_verse_id: "",
   notes: "", host_name: "",
 };
 
@@ -133,6 +135,8 @@ function ProposeForm({ user, profile, onDone, onCancel }) {
   const [f, setF] = useState(BLANK);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [curriculum, setCurriculum] = useState([]);
+  useEffect(() => { fetchCurriculumVerses().then(r => setCurriculum(r.data || [])); }, []);
   const direct = canPublishDirectly(profile);
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
@@ -216,6 +220,18 @@ function ProposeForm({ user, profile, onDone, onCancel }) {
                 ? "The standard Scripture Gym room. Leave it as it is unless this one meets somewhere else."
                 : "Meeting somewhere other than the standard Scripture Gym room."}
             </div>
+          </L>
+
+          <L label="This week's memory verse — what the men train on after this session" full>
+            <select style={{ ...inputBase, appearance: "none" }} value={f.memory_verse_id}
+              onChange={e => set("memory_verse_id", e.target.value)}>
+              <option value="">No verse assigned</option>
+              {curriculum.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.reference} — {v.muscle_group?.name}
+                </option>
+              ))}
+            </select>
           </L>
 
           <L label="Focus verses" full>

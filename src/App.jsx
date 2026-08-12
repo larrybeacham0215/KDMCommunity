@@ -6,7 +6,7 @@ import {
   Server, Dumbbell, LibraryBig, ExternalLink
 } from "lucide-react";
 import { supabase } from "./dataService";
-import { T, Crest, Eyebrow, Btn, Card } from "./ui";
+import { T, Crest, Eyebrow, Btn, Card, firstName } from "./ui";
 import { AdminScreen, SystemsScreen, OWNER_NAV, SYSTEMS_SUB, ADMIN_TITLES } from "./admin";
 import { ScriptureGymApp } from "./scripturegym";
 import { PublicSharePage, JoinPage } from "./gymSessions";
@@ -345,6 +345,12 @@ function Dashboard({ user, go, streak, progress, staff }) {
   const [today, setToday] = useState(null);
   const [repBusy, setRepBusy] = useState(false);
 
+  const startWeekVerse = async () => {
+    const { error } = await supabase.rpc("start_week_verse");
+    if (!error) { const { data } = await supabase.rpc("get_today"); if (data) setToday(data); }
+    go("scripturegym");
+  };
+
   const markRepDone = async () => {
     if (repBusy || today?.rep_done) return;
     setRepBusy(true);
@@ -405,7 +411,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
       <Eyebrow>The Forge</Eyebrow>
       <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 18px", textTransform: "capitalize" }}>
-        Welcome back, {user.name}.
+        Welcome back, {firstName(user.name) || user.name}.
       </h2>
 
       {/* ---- TODAY'S REP — the one thing. Everything else is below it. ---- */}
@@ -473,6 +479,58 @@ function Dashboard({ user, go, streak, progress, staff }) {
               ))}
             </div>
           )}
+        </Card>
+      )}
+
+      {/* ---- THIS WEEK'S VERSE — set by Monday's session. The link between
+             the room and the training that was missing. ---- */}
+      {today?.week_verse?.verse_id && (
+        <Card pad={0} style={{ marginBottom: 14, overflow: "hidden" }}>
+          <div style={{ padding: "18px 22px 18px",
+            background: "linear-gradient(135deg, rgba(184,134,59,.09), transparent 68%)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+              gap: 10, marginBottom: 9, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".24em",
+                textTransform: "uppercase", color: T.bronze }}>
+                {today.week_verse.upcoming ? "Coming Monday" : "This week's verse"}
+              </span>
+              {today.week_verse.group_name && (
+                <span style={{ fontFamily: T.reg, fontSize: 9.5, letterSpacing: ".16em",
+                  textTransform: "uppercase", color: T.muted2, border: `1px solid ${T.lineSoft}`,
+                  borderRadius: 20, padding: "3px 10px" }}>{today.week_verse.group_name}</span>
+              )}
+            </div>
+
+            <p style={{ fontFamily: T.serif, fontSize: 18, lineHeight: 1.5, color: T.cream,
+              margin: "0 0 8px" }}>&ldquo;{today.week_verse.verse_text}&rdquo;</p>
+            <div style={{ fontFamily: T.reg, fontSize: 12.5, color: T.bronzeLt, marginBottom: 13 }}>
+              {today.week_verse.reference}
+              <span style={{ color: T.muted2 }}>
+                {" · from "}{today.week_verse.session_title}
+              </span>
+            </div>
+
+            {today.week_verse.memorized ? (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8,
+                color: "#5cb377", fontFamily: T.reg, fontSize: 12.5, letterSpacing: ".08em",
+                textTransform: "uppercase" }}>
+                <CheckCircle2 size={16} /> Memorized
+              </div>
+            ) : (
+              <button onClick={startWeekVerse} style={{
+                display: "inline-flex", alignItems: "center", gap: 8, minHeight: 44,
+                padding: "12px 22px", borderRadius: 3, cursor: "pointer",
+                fontFamily: T.reg, fontSize: 12, fontWeight: 700, letterSpacing: ".1em",
+                textTransform: "uppercase",
+                background: today.week_verse.started ? "transparent" : T.gold,
+                color: today.week_verse.started ? T.bronzeLt : "#1a1206",
+                border: today.week_verse.started ? `1px solid ${T.line}` : "none",
+              }}>
+                {today.week_verse.started ? "Keep training it" : "Train this verse"}
+                <ChevronRight size={14} />
+              </button>
+            )}
+          </div>
         </Card>
       )}
 

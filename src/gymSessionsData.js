@@ -113,6 +113,7 @@ export async function createMeeting(userId, form, status = "pending") {
     discussion_questions: form.discussion_questions || null,
     notes: form.notes || null,
     cover_key: form.cover_key || "iron",
+    memory_verse_id: form.memory_verse_id || null,
     scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
     duration_minutes: Number(form.duration_minutes) || 60,
     join_url: (form.join_url || "").trim() || DEFAULT_JOIN_URL,
@@ -209,4 +210,15 @@ export function toLocalInput(iso) {
   const d = iso ? new Date(iso) : new Date();
   const off = d.getTimezoneOffset();
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
+}
+
+
+/** Curriculum verses, grouped, for the "week's memory verse" picker on a session. */
+export async function fetchCurriculumVerses() {
+  const { data, error } = await supabase
+    .from("verses")
+    .select("id, reference, verse_text, muscle_group:muscle_groups!verses_muscle_group_id_fkey(name, owner_type)")
+    .order("reference", { ascending: true });
+  const rows = (data || []).filter(v => v.muscle_group?.owner_type === "official");
+  return { data: rows, error };
 }

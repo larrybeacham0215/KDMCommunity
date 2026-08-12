@@ -88,3 +88,23 @@ export const inputBase = {
 export const Field = ({ label }) => (
   <label style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".16em", textTransform: "uppercase", color: T.muted, display: "block", marginBottom: 6 }}>{label}</label>
 );
+
+/* Greetings use the first name only. "Welcome back, Larry Beacham." reads like a
+   form letter; "Welcome back, Larry." reads like someone who knows him. The full
+   name still lives on the profile and the roster — this is only for address.
+   Mirrors firstName() in the gym-mailer function so app and email agree. */
+export function firstName(full) {
+  const raw = String(full ?? "").trim();
+  if (!raw) return "";
+  if (raw.includes("@")) return raw.split("@")[0];
+  const parts = raw.replace(/,+$/, "").split(/\s+/)
+    .filter((w, i) => !(i === 0 && /^(mr|mrs|ms|dr|pastor|rev|sr|fr|bro|coach)\.?$/i.test(w)));
+  if (!parts.length) return "";
+  if (parts.every(w => w.replace(/\./g, "").length === 1)) {
+    return parts.map(w => w.replace(/\./g, "").toUpperCase()).join("");
+  }
+  const f = parts[0].replace(/,+$/, "");
+  if (f.length > 3 && f === f.toUpperCase()) return f[0] + f.slice(1).toLowerCase();
+  if (f === f.toLowerCase()) return f[0].toUpperCase() + f.slice(1);
+  return f;
+}
