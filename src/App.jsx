@@ -1100,90 +1100,108 @@ function CheckIn({ checkins, addCheckin, onStreak }) {
    PROFILE
    ========================================================================== */
 /* ===========================================================================
-   RESOURCES — outside tools the men get through the Kingdom
+   RESOURCES — three shelves: Watch, Read, Do.
+   Content lives in app_resources so a book or a link can be added with one
+   INSERT instead of a deploy.
    ========================================================================= */
-const RIGHTNOW_JOIN = "https://app.rightnowmedia.org/en/join/GraceFamilyChurch";
+const SHELVES = [
+  { key: "watch", label: "Watch", note: "Video teaching, already paid for." },
+  { key: "read",  label: "Read",  note: "Books that have shaped the men in this room." },
+  { key: "do",    label: "Do",    note: "The work itself." },
+];
 
-function Resources() {
+function ResourceCard({ r, go }) {
+  const open = () => {
+    if (r.internal_view) go(r.internal_view);
+    else if (r.url) window.open(r.url, "_blank", "noopener,noreferrer");
+  };
+  return (
+    <Card pad={0} style={{ marginBottom: 12, overflow: "hidden" }}>
+      <div style={{ padding: "18px 20px 18px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontFamily: T.display, fontSize: 19, color: T.cream, lineHeight: 1.2 }}>
+              {r.title}
+            </div>
+            {r.byline && (
+              <div style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted2, marginTop: 3 }}>
+                {r.byline}
+              </div>
+            )}
+          </div>
+          {r.badge && (
+            <span style={{ fontFamily: T.reg, fontSize: 9, letterSpacing: ".14em",
+              textTransform: "uppercase", color: T.bronze, border: `1px solid ${T.line}`,
+              borderRadius: 20, padding: "4px 10px", whiteSpace: "nowrap" }}>{r.badge}</span>
+          )}
+        </div>
+
+        <p style={{ fontFamily: T.body, fontSize: 14.5, lineHeight: 1.6, color: T.muted,
+          margin: "10px 0 0" }}>{r.blurb}</p>
+
+        {r.for_whom && (
+          <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 14, lineHeight: 1.55,
+            color: T.bronzeLt, margin: "12px 0 0", paddingLeft: 12,
+            borderLeft: `2px solid ${T.lineSoft}` }}>{r.for_whom}</p>
+        )}
+
+        <button onClick={open} style={{
+          marginTop: 16, display: "inline-flex", alignItems: "center", gap: 8, minHeight: 44,
+          padding: "12px 22px", borderRadius: 3, cursor: "pointer",
+          background: r.internal_view ? "transparent" : T.gold,
+          color: r.internal_view ? T.bronzeLt : "#1a1206",
+          border: r.internal_view ? `1px solid ${T.line}` : "none",
+          fontFamily: T.reg, fontSize: 12, fontWeight: 700, letterSpacing: ".1em",
+          textTransform: "uppercase",
+        }}>
+          {r.cta_label}
+          {r.internal_view ? <ChevronRight size={14} /> : <ExternalLink size={14} />}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function Resources({ go }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    supabase.from("app_resources").select("*").eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => setRows(data || []));
+  }, []);
+
   return (
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
       <Eyebrow>Resources</Eyebrow>
       <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 6px" }}>
         What's available to you
       </h2>
-      <p style={{ fontFamily: T.body, color: T.muted, fontSize: 15, lineHeight: 1.6, marginTop: 0, marginBottom: 22, maxWidth: "62ch" }}>
-        Tools and libraries the Kingdom has opened up for the men. Free to you — no card, no catch.
+      <p style={{ fontFamily: T.body, color: T.muted, fontSize: 15, lineHeight: 1.6,
+        margin: "0 0 8px", maxWidth: "62ch" }}>
+        Tools the Kingdom has opened up for the men. You do not need all of it —
+        you need one of it, actually finished.
       </p>
 
-      <Card pad={0} style={{ overflow: "hidden" }}>
-        <div style={{
-          padding: "26px 24px 22px",
-          background: "linear-gradient(135deg, rgba(200,134,46,.10), transparent 70%)",
-          borderBottom: `1px solid ${T.lineSoft}`,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 12 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 3, flex: "0 0 auto",
-              border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(200,134,46,.10)",
-            }}><LibraryBig size={21} color={T.bronzeLt} /></div>
-            <div>
-              <div style={{ fontFamily: T.display, fontSize: 21, color: T.cream, lineHeight: 1.1 }}>
-                RightNow Media
-              </div>
-              <div style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".18em",
-                textTransform: "uppercase", color: T.bronze, marginTop: 4 }}>
-                Sponsored by Grace Family Church
-              </div>
+      {rows === null ? (
+        <div style={{ padding: 30, color: T.muted2 }}>Loading…</div>
+      ) : SHELVES.map(sh => {
+        const items = rows.filter(r => r.shelf === sh.key);
+        if (!items.length) return null;
+        return (
+          <div key={sh.key} style={{ marginTop: 30 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4,
+              paddingBottom: 8, borderBottom: `1px solid ${T.lineSoft}` }}>
+              <span style={{ fontFamily: T.reg, fontSize: 12, letterSpacing: ".26em",
+                textTransform: "uppercase", color: T.bronze }}>{sh.label}</span>
+              <span style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted2 }}>{sh.note}</span>
+            </div>
+            <div style={{ marginTop: 14 }}>
+              {items.map(r => <ResourceCard key={r.id} r={r} go={go} />)}
             </div>
           </div>
-
-          <p style={{ fontFamily: T.body, fontSize: 15, lineHeight: 1.65, color: T.cream, margin: "0 0 12px" }}>
-            Think of it as the Netflix of Bible study — a streaming library of more than
-            25,000 video studies you can watch on your phone, tablet, computer, or TV.
-          </p>
-          <p style={{ fontFamily: T.body, fontSize: 14.5, lineHeight: 1.65, color: T.muted, margin: 0 }}>
-            Series on marriage, fatherhood, leadership, finances, and recovery, taught by
-            voices like Tony Evans, Francis Chan, and John Maxwell — plus safe shows for the
-            kids. Use it for your own morning time, or run a series with the men in your
-            cohort. Downloads work offline, so it travels with you.
-          </p>
-        </div>
-
-        <div style={{ padding: "20px 24px 24px" }}>
-          <div style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".2em",
-            textTransform: "uppercase", color: T.muted2, marginBottom: 10 }}>
-            How to get in
-          </div>
-          <p style={{ fontFamily: T.body, fontSize: 14.5, lineHeight: 1.6, color: T.muted, margin: "0 0 18px" }}>
-            RightNow Media isn't sold to individuals — you get it through a church.
-            Grace Family Church covers this one, so it costs you nothing. Tap below,
-            create your free account, and the whole library opens up.
-          </p>
-
-          <a
-            href={RIGHTNOW_JOIN}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
-              background: T.gold, color: "#1a1206", textDecoration: "none",
-              fontFamily: T.reg, fontSize: 13, fontWeight: 700, letterSpacing: ".1em",
-              textTransform: "uppercase", padding: "15px 30px", borderRadius: 3,
-              minHeight: 48, boxSizing: "border-box",
-            }}
-          >
-            Claim your free access <ExternalLink size={15} />
-          </a>
-
-          <p style={{ fontFamily: T.body, fontSize: 12.5, lineHeight: 1.55, color: T.muted2, margin: "16px 0 0", wordBreak: "break-all" }}>
-            Or paste this into your browser:{" "}
-            <a href={RIGHTNOW_JOIN} target="_blank" rel="noopener noreferrer" style={{ color: T.bronze }}>
-              {RIGHTNOW_JOIN}
-            </a>
-          </p>
-        </div>
-      </Card>
+        );
+      })}
     </div>
   );
 }
@@ -1376,7 +1394,7 @@ export default function App() {
           </div>
         )}
         {view === "profile" && <Profile user={user} streak={streak} checkins={checkins} />}
-        {view === "resources" && <Resources />}
+        {view === "resources" && <Resources go={setView} />}
         {view === "path" && <PathScreen />}
 
         {/* Owner Command + Systems (UI gate; RLS enforces at the DB regardless) */}
