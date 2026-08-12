@@ -218,7 +218,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
   // Outside links and member perks. Its own section so it doesn't read as
   // another part of the program.
   const resourceItems = [
-    { id: "resources", label: "RightNow Media", icon: LibraryBig },
+    { id: "resources", label: "Library", icon: LibraryBig },
   ];
   const navBtn = (it, opts = {}) => {
     const active = view === it.id;
