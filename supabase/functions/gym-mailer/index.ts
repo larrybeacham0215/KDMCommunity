@@ -44,11 +44,11 @@ const cors = {
 // Every email closes the same way. A man should know who it came from without
 // checking the header — that is what makes it a letter and not a notification.
 const SIGNATURE = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;border-top:1px solid rgba(216,168,92,.14);">
-      <tr><td style="padding-top:20px;">
-        <p style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-style:italic;color:#c8862e;">Go forth in victory!</p>
-        <p style="margin:0;font-size:15px;color:#f7f1e6;font-family:Georgia,'Times New Roman',serif;">Larry Beacham</p>
-        <p style="margin:2px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#8a7f6d;">Founder, Kingdom of Disciplined Men</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;border-top:1px solid rgba(216,168,92,.14);">
+      <tr><td style="padding-top:20px;font-family:Georgia,'Times New Roman',serif;">
+        <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:17px;font-style:italic;color:#c8862e;line-height:1.4;">Go forth in victory!</p>
+        <p style="margin:0 0 3px;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-style:italic;color:#c8862e;line-height:1.4;">Larry Beacham</p>
+        <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-style:italic;color:#a08d6d;line-height:1.4;">Founder, Kingdom of Disciplined Men</p>
       </td></tr>
     </table>`;
 
@@ -100,6 +100,13 @@ const firstName = (full?: string) => {
 };
 
 // Day name from the meeting itself — never hardcode a weekday in a subject line.
+// The live meeting row wins over the payload. The payload is a snapshot taken
+// when the row was queued; a title can be edited between then and the send, and
+// a hand-queued row may carry no payload at all. Either way an email must never
+// go out saying "undefined".
+const mTitle = (d: Record<string, unknown>, m: Record<string, unknown>) =>
+  String(m?.title ?? d?.title ?? "Scripture Gym");
+
 const greet = (n?: string) => (n ? `Hey ${esc(n)} \u2014 ` : "Hey brother \u2014 ");
 
 const dayName = (iso?: string) => {
@@ -167,18 +174,18 @@ type Ctx = { d: Record<string, unknown>; m: Record<string, unknown>; name: strin
 
 const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> = {
   meeting_submitted_creator: ({ d, name }) => ({
-    subject: `Received: ${d.title}`,
+    subject: `Received: ${mTitle(d, m)}`,
     html: shell("We've got it", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}your workout <strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been submitted.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}your workout <strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> has been submitted.`),
       p("Nothing else is needed from you. It's with Larry for the keys — you'll hear the moment it's cleared."),
       p(`<strong style="color:#f7f1e6;">Good work putting this together, ${esc(name || "brother")}. I will look at it shortly.</strong>`),
     ].join("")),
   }),
 
   meeting_needs_approval: ({ d, m }) => ({
-    subject: `Needs your keys: ${d.title}`,
+    subject: `Needs your keys: ${mTitle(d, m)}`,
     html: shell("A workout is waiting on you", [
-      p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong> was submitted by ${esc(d.submitted_by || "a member")}.`),
+      p(`<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> was submitted by ${esc(d.submitted_by || "a member")}.`),
       detail("When", when(m.scheduled_at as string)),
       p("Approving opens it to the men and makes the join link live."),
       p(`<strong style="color:#f7f1e6;">One decision from you and this opens to the men.</strong>`),
@@ -186,9 +193,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   }),
 
   meeting_approved_creator: ({ d, m, name }) => ({
-    subject: `Cleared: ${d.title}`,
+    subject: `Cleared: ${mTitle(d, m)}`,
     html: shell("You're cleared", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> is approved and open to the men.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> is approved and open to the men.`),
       detail("When", when(m.scheduled_at as string)),
       p("Share this link anywhere — it works for people who don't have an account."),
       p(`<strong style="color:#f7f1e6;">Now fill the room, ${esc(name || "brother")}. Send that link to one man today.</strong>`),
@@ -196,9 +203,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   }),
 
   meeting_rejected_creator: ({ d, name }) => ({
-    subject: `Sent back: ${d.title}`,
+    subject: `Sent back: ${mTitle(d, m)}`,
     html: shell("Not this one — yet", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> wasn't cleared.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> wasn't cleared.`),
       d.reason ? detail("What to fix", String(d.reason)) : "",
       p("Adjust it and submit again. This isn't a no, it's a not like this."),
       p(`<strong style="color:#f7f1e6;">This is not a no, ${esc(name || "brother")}. It is a not like this. Send it back to me.</strong>`),
@@ -206,9 +213,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   }),
 
   manager_assigned: ({ d, m, name }) => ({
-    subject: `You're covering: ${d.title}`,
+    subject: `You're covering: ${mTitle(d, m)}`,
     html: shell("You've been asked to cover a session", [
-      p(`You're the manager on <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
+      p(`You're the manager on <strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong>.`),
       detail("When", when(m.scheduled_at as string)),
       p("That means you're expected in the room, vouching for it."),
       p(`<strong style="color:#f7f1e6;">Thank you for covering this one, ${esc(name || "brother")}. The men will feel it.</strong>`),
@@ -216,9 +223,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   }),
 
   meeting_published_members: ({ d, m, name }) => ({
-    subject: `New workout: ${d.title}`,
+    subject: `New workout: ${mTitle(d, m)}`,
     html: shell("A new workout is open", [
-      p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong>`),
+      p(`<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong>`),
       detail("When", when(m.scheduled_at as string)),
       m.description ? p(esc(m.description)) : "",
       p("Seats aren't limited, but showing up is."),
@@ -227,9 +234,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   }),
 
   registration_confirmed: ({ d, m, name }) => ({
-    subject: `Your seat is saved: ${d.title}`,
+    subject: `Your seat is saved: ${mTitle(d, m)}`,
     html: shell("Your seat is saved", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}you're in for <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}you're in for <strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong>.`),
       detail("When", when((d.scheduled_at || m.scheduled_at) as string)),
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       questions(m.discussion_questions as string),
@@ -252,9 +259,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   }),
 
   weekly_open_gym: ({ d, m, name }) => ({
-    subject: `${dayName((d.scheduled_at || m.scheduled_at) as string)}: ${d.title}`,
+    subject: `${dayName((d.scheduled_at || m.scheduled_at) as string)}: ${mTitle(d, m)}`,
     html: shell("This week at the gym", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> meets this week. Same room, same time, every week.`),
+      p(`${greet(name)}we're back in the room this week for <strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong>. Same room, same time, the way it runs every week.`),
       detail("When", when((d.scheduled_at || m.scheduled_at) as string)),
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       questions(m.discussion_questions as string),
@@ -267,9 +274,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     const h = hoursUntil(m.scheduled_at as string);
     const days = h === null ? null : Math.round(h / 24);
     return {
-      subject: `${days !== null && days <= 1 ? "Coming up" : `${days} days out`}: ${d.title}`,
+      subject: `${days !== null && days <= 1 ? "Coming up" : `${days} days out`}: ${mTitle(d, m)}`,
       html: shell("On the calendar", [
-        p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> is ${days !== null && days <= 1 ? "almost here" : `${days} days out`}.`),
+        p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> is ${days !== null && days <= 1 ? "almost here" : `${days} days out`}.`),
         detail("When", when(m.scheduled_at as string)),
         m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
         p("Far enough out to move what needs moving. Put it in your calendar now."),
@@ -278,9 +285,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   },
 
   meeting_rescheduled: ({ d, m, name }) => ({
-    subject: `New time: ${d.title}`,
+    subject: `New time: ${mTitle(d, m)}`,
     html: shell("The time has moved", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been rescheduled. Your seat is still yours — nothing to do but note the new time.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> has been rescheduled. Your seat is still yours — nothing to do but note the new time.`),
       detail("Was", when(d.old_time as string)),
       detail("Now", when((d.new_time || m.scheduled_at) as string)),
       p("Your reminders have already been moved with it."),
@@ -290,9 +297,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   reminder_24h: ({ d, m, name }) => {
     const l = lead(hoursUntil(m.scheduled_at as string));
     return {
-      subject: `${l.word}: ${d.title}`,
+      subject: `${l.word}: ${mTitle(d, m)}`,
       html: shell(l.word, [
-        p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${l.sentence}.`),
+        p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> ${l.sentence}.`),
         detail("When", when(m.scheduled_at as string)),
         questions(m.discussion_questions as string),
         p(`<strong style="color:#f7f1e6;">Clear the night if you can, ${esc(name || "brother")}. It is worth the hour.</strong>`),
@@ -304,9 +311,9 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     const h = hoursUntil(m.scheduled_at as string);
     const soon = h !== null && h < 0.75;
     return {
-      subject: soon ? `Starting now: ${d.title}` : `One hour: ${d.title}`,
+      subject: soon ? `Starting now: ${mTitle(d, m)}` : `One hour: ${mTitle(d, m)}`,
       html: shell(soon ? "Starting now" : "One hour out", [
-        p(`<strong style="color:#f7f1e6;">${esc(d.title)}</strong> ${soon ? "is starting" : "starts in an hour"}.`),
+        p(`<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> ${soon ? "is starting" : "starts in an hour"}.`),
         detail("Starts", when(m.scheduled_at as string)),
         p("Bring something to write with."),
         p(`<strong style="color:#f7f1e6;">See you in there, ${esc(name || "brother")}.</strong>`),
@@ -315,18 +322,18 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
   },
 
   meeting_cancelled: ({ d, name }) => ({
-    subject: `Cancelled: ${d.title}`,
+    subject: `Cancelled: ${mTitle(d, m)}`,
     html: shell("This one's been called off", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(d.title)}</strong> has been cancelled.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}<strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong> has been cancelled.`),
       p("Nothing is required from you. Watch for the next one."),
       p(`<strong style="color:#f7f1e6;">Nothing is required from you, ${esc(name || "brother")}. Watch for the next one.</strong>`),
     ].join(""), { label: "See what's open", url: APP }),
   }),
 
   meeting_completed_followup: ({ d, m, name }) => ({
-    subject: `Recap: ${d.title}`,
+    subject: `Recap: ${mTitle(d, m)}`,
     html: shell("In the books", [
-      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}thank you for showing up to <strong style="color:#f7f1e6;">${esc(d.title)}</strong>.`),
+      p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}thank you for showing up to <strong style="color:#f7f1e6;">${esc(mTitle(d, m))}</strong>.`),
       m.notes ? detail("Notes", String(m.notes)) : "",
       m.focus_verses ? detail("Verses", String(m.focus_verses)) : "",
       p("The work continues where nobody's watching."),
