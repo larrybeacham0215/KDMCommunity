@@ -89,6 +89,8 @@ const firstName = (full?: string) => {
 };
 
 // Day name from the meeting itself — never hardcode a weekday in a subject line.
+const greet = (n?: string) => (n ? `Hey ${esc(n)} \u2014 ` : "Hey brother \u2014 ");
+
 const dayName = (iso?: string) => {
   if (!iso) return "This week";
   return "This " + new Date(iso).toLocaleDateString("en-US", {
@@ -313,6 +315,59 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
       p(`${name ? `Hey ${esc(name)} \u2014 ` : "Hey brother \u2014 "}${esc(d.invited_by_name || "a brother")} invited you into the Scripture Gym.`),
       p("It's where the men train the Word like iron — live sessions, honest rooms, and the discipline of showing up."),
     ].join(""), { label: "Step in", url: APP }),
+  }),
+
+  /* ---- WELCOME SERIES, days 2-5. Day 1 is welcome_member above.
+     Each one ends with exactly one action. Queued on signup by
+     gym_enqueue_welcome() with staggered send_after. ---- */
+
+  welcome_day2: ({ name }) => ({
+    subject: "Why we memorize (it's not what you think)",
+    html: shell("Why we memorize", [
+      p(`${greet(name)}most men know <em>about</em> the Bible. Fewer men have it <em>in</em> them.`),
+      p("There's a difference between a verse you can look up and a verse that shows up uninvited — at 11 PM when you're about to send the text you shouldn't send. At the dinner table when your son asks something you weren't ready for. In the argument, before you say the thing you can't take back."),
+      p("You can't look up what you haven't stored."),
+      p("That's what the Scripture Gym is. Not a Bible trivia contest. A weight room for the only muscle that decides who you are when nobody's watching."),
+      p("Verses are grouped into <strong style=\"color:#f7f1e6;\">muscle groups</strong> — marriage, fatherhood, temper, provision, integrity. You pick one. You train a few reps at a time."),
+      p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> open the Scripture Gym and pick the muscle group that names your weakest area. Not your strongest. Your weakest."),
+    ].join(""), { label: "Open the Scripture Gym", url: APP }),
+  }),
+
+  welcome_day3: ({ name }) => ({
+    subject: "What actually happens Monday night",
+    html: shell("What happens in the room", [
+      p(`${greet(name)}some men have never sat in a room like this, so let me take the mystery out of it.`),
+      detail("When", "Every Monday, 7:00 PM ET. One link, same room."),
+      p("<strong style=\"color:#f7f1e6;\">We open with study.</strong> A passage, and a real conversation about it. Not a lecture you sit through — a discussion you're in. Men say true things about their marriages, their tempers, their fathers, their work."),
+      p("<strong style=\"color:#f7f1e6;\">We close with the reps.</strong> You leave with the week's memory verse and a clear thing to work on."),
+      p("You don't have to talk. First-timers often don't, and nobody pushes. But most men find out fast that saying the true thing out loud, to men who won't flinch, does something no book does."),
+      p("Come as you are. Come tired. Come from the car. Just come."),
+      p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> put Monday 7:00 PM on your calendar right now, before you close this. Set it to repeat."),
+    ].join(""), { label: "See this week's session", url: APP }),
+  }),
+
+  welcome_day4: ({ name }) => ({
+    subject: "Tools we've already paid for",
+    html: shell("Already covered", [
+      p(`${greet(name)}a man who wants to grow shouldn't be blocked by a paywall. So some of this is already handled.`),
+      p("<strong style=\"color:#f7f1e6;\">RightNow Media</strong> — think Netflix for Bible study. More than 25,000 video studies on marriage, fatherhood, money, leadership and recovery, from teachers like Tony Evans, Francis Chan and John Maxwell. Safe shows for your kids too. Grace Family Church sponsors it, so it costs you nothing."),
+      p("<strong style=\"color:#f7f1e6;\">The reading list.</strong> Start with <em>Disciplines of a Godly Man</em> if you want the foundation, or <em>Stand Firm</em> if you want the shorter, sharper hit."),
+      p("You don't need all of it. You need one of it, actually finished."),
+      p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> claim your RightNow Media access — two minutes — or order one book. One. Then close the tab and go be present with your people."),
+    ].join(""), { label: "Open Resources", url: APP }),
+  }),
+
+  welcome_day5: ({ name }) => ({
+    subject: "The only thing that separates these men",
+    html: shell("The honest part", [
+      p(`${greet(name)}five days in. Here's the honest part.`),
+      p("Nothing in this app will change you. Not the verses, not the videos, not the Monday room. Men have sat in rooms like this for years and walked out exactly as they came in."),
+      p("What changes a man is the boring thing: showing up when he doesn't feel like it. Again. And again."),
+      p("That's the whole secret, and it's why this is built like a gym instead of a library. Nobody gets strong reading about squats."),
+      p(`<em style="color:#c8862e;">"Let us not grow weary in well-doing, for in due time we will reap a harvest, if we do not give up." — Galatians 6:9</em>`),
+      p("You will miss a Monday. You will drop a streak. That isn't failure, that's a rep you didn't get. Get the next one."),
+      p("<strong style=\"color:#f7f1e6;\">Today's rep:</strong> mark one verse as memorized. Your first. Then show up Monday and tell a brother you did it."),
+    ].join(""), { label: "Train a verse", url: APP }),
   }),
 
   welcome_member: ({ name }) => ({

@@ -338,20 +338,32 @@ function Dashboard({ user, go, streak, progress, staff }) {
   const [verse, setVerse] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  // A new man needs a path, not a dashboard. We show Start Here until he has
+  // actually done something, then it retires itself — no dismiss button to
+  // hunt for, and it comes back if he somehow ends up with nothing again.
+  const [firstSteps, setFirstSteps] = useState(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [v, s] = await Promise.all([
+      const [v, s, prog] = await Promise.all([
         supabase.rpc("verse_of_the_day"),
         supabase.from("gym_meetings")
           .select("id, title, scheduled_at, duration_minutes, cover_key, status, host_name, host:profiles!gym_meetings_host_id_fkey(full_name)")
           .eq("status", "approved")
           .order("scheduled_at", { ascending: true })
           .limit(3),
+        supabase.from("user_verse_progress")
+          .select("status", { count: "exact", head: false })
+          .eq("user_id", user.id),
       ]);
       if (!alive) return;
       if (v.data) setVerse(v.data);
+      const rows = prog?.data || [];
+      setFirstSteps({
+        picked: rows.length > 0,
+        memorized: rows.some(r => r.status === "memorized"),
+      });
       if (s.data) setSessions(s.data.filter(m => !m.scheduled_at || new Date(m.scheduled_at) > new Date(Date.now() - 36e5)));
       setLoaded(true);
     })();
@@ -379,6 +391,68 @@ function Dashboard({ user, go, streak, progress, staff }) {
       <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 18px", textTransform: "capitalize" }}>
         Welcome back, {user.name}.
       </h2>
+
+      {/* ---- Start Here: retires itself once he's training ---- */}
+      {firstSteps && !firstSteps.memorized && (
+        <Card pad={0} style={{ marginBottom: 18, overflow: "hidden",
+          border: `1px solid ${T.bronzeDim || "rgba(200,134,46,.35)"}` }}>
+          <div style={{ padding: "20px 22px 18px",
+            background: "linear-gradient(135deg, rgba(200,134,46,.13), transparent 70%)" }}>
+            <div style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".24em",
+              textTransform: "uppercase", color: T.bronze, marginBottom: 8 }}>Start here</div>
+            <div style={{ fontFamily: T.display, fontSize: 23, color: T.cream, marginBottom: 6 }}>
+              Three things, then you're training
+            </div>
+            <p style={{ fontFamily: T.body, fontSize: 14.5, color: T.muted, lineHeight: 1.6, margin: "0 0 16px" }}>
+              This is a gym, not a library. Here's the whole starting line.
+            </p>
+
+            {[
+              { n: 1, done: firstSteps.picked,
+                title: "Pick your first verse",
+                blurb: "Choose the muscle group that names your weakest area — not your strongest.",
+                cta: "Open the Gym", go: "scripturegym" },
+              { n: 2, done: false,
+                title: "Put Monday on your calendar",
+                blurb: "We meet Mondays, 7:00 PM ET. Study first, then the reps. Come as you are.",
+                cta: "See the session", go: "scripturegym" },
+              { n: 3, done: false,
+                title: "Claim what's already paid for",
+                blurb: "RightNow Media is sponsored for you — 25,000+ studies, no cost.",
+                cta: "Open Resources", go: "resources" },
+            ].map(step => (
+              <div key={step.n} style={{ display: "flex", gap: 13, alignItems: "flex-start",
+                padding: "12px 0", borderTop: `1px solid ${T.lineSoft}` }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: "50%", flex: "0 0 auto", marginTop: 2,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1px solid ${step.done ? T.bronze : T.line}`,
+                  background: step.done ? "rgba(200,134,46,.18)" : "transparent",
+                  color: step.done ? T.bronzeLt : T.muted2,
+                  fontFamily: T.reg, fontSize: 12, fontWeight: 700,
+                }}>{step.done ? <CheckCircle2 size={15} /> : step.n}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: T.body, fontSize: 15, color: step.done ? T.muted2 : T.cream,
+                    textDecoration: step.done ? "line-through" : "none", marginBottom: 3 }}>
+                    {step.title}
+                  </div>
+                  <div style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted, lineHeight: 1.55 }}>
+                    {step.blurb}
+                  </div>
+                  {!step.done && (
+                    <button onClick={() => go(step.go)} style={{
+                      marginTop: 8, background: "none", border: "none", padding: "6px 0",
+                      color: T.bronzeLt, cursor: "pointer", fontFamily: T.reg, fontSize: 12,
+                      letterSpacing: ".1em", textTransform: "uppercase",
+                      display: "inline-flex", alignItems: "center", gap: 5, minHeight: 32,
+                    }}>{step.cta} <ChevronRight size={13} /></button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* ---- verse of the day: the front door into the Gym ---- */}
       <Card pad={0} style={{ marginBottom: 18, overflow: "hidden", cursor: "pointer" }}

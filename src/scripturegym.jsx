@@ -15,6 +15,21 @@ import {
 import { GymSessions } from "./gymSessions";
 
 /* ---------------------------------------------------------------------------
+   FEATURE FREEZE — parked until there are enough men for them to mean anything.
+   A leaderboard with two names on it discourages more than it motivates, and a
+   feed nobody posts in reads like an empty room. The code, the tables and the
+   data all stay intact; only the entry points are hidden. Flip a flag back to
+   true to bring one back — no rebuild of the feature required.
+   Revisit at ~50 active men. (Frozen 2026-08-12.)
+   ------------------------------------------------------------------------- */
+const SHOW = {
+  leaderboard: false,
+  badges:      false,
+  cohorts:     false,   // My Cohorts + My Groups feed
+  proposals:   false,   // Admin content-proposal queue
+};
+
+/* ---------------------------------------------------------------------------
    Two systems live behind one nav entry:
      Sessions — live group workouts you show up to (gym_meetings)
      Training — the memorization gym: muscle groups, verses, streaks
@@ -630,6 +645,7 @@ function ProgressScreen({ user, onBack }) {
             </Card>
           </div>
 
+          {SHOW.badges && <>
           {sectionLabel("Badges Earned")}
           <Card pad={18} style={{ marginBottom: 22 }}>
             <div style={{ fontFamily: T.body, fontSize: 11, color: T.muted2, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
@@ -649,6 +665,7 @@ function ProgressScreen({ user, onBack }) {
               ))}
             </div>
           </Card>
+          </>}
 
           {sectionLabel("By Muscle Group")}
           {allGroups.length === 0 ? <Empty>No muscle groups yet.</Empty> : allGroups.map(g => (
@@ -1305,11 +1322,11 @@ export function ScriptureGymApp({ user, role, profile }) {
         sub="Train the Word like iron. A place to build, drill, and strengthen scripture memory for the men."
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
-            <Btn kind="ghost" onClick={() => setShowMyGroups(true)}><Users size={14} /> My Groups</Btn>
+            {SHOW.cohorts && isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
+            {SHOW.cohorts && <Btn kind="ghost" onClick={() => setShowMyGroups(true)}><Users size={14} /> My Groups</Btn>}
             <Btn kind="ghost" onClick={() => setShowBibleSearch(true)}><Search size={14} /> Search Bible</Btn>
-            {isAdminOrOwner && <Btn kind="ghost" onClick={() => setShowProposeContent(true)}><Sparkles size={14} /> Propose Content</Btn>}
-            <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>
+            {SHOW.proposals && isAdminOrOwner && <Btn kind="ghost" onClick={() => setShowProposeContent(true)}><Sparkles size={14} /> Propose Content</Btn>}
+            {SHOW.leaderboard && <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>}
             <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
             <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>
             <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
