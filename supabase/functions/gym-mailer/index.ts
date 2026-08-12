@@ -407,6 +407,23 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     ].join(""), { label: "Train a verse", url: APP }),
   }),
 
+  /* The Daily Rep. Same content the app shows on the Forge that morning —
+     both read public.daily_reps, so the email and the screen can never
+     disagree about what today's work is. */
+  daily_rep: ({ d, name }) => ({
+    subject: String(d.headline || "Today's rep"),
+    html: shell(String(d.headline || "Today's rep"), [
+      d.verse_text
+        ? `<p style="margin:0 0 16px;padding-left:14px;border-left:2px solid rgba(216,168,92,.25);font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:16px;line-height:1.55;color:#c8862e;">&ldquo;${esc(d.verse_text)}&rdquo;<span style="display:block;font-style:normal;font-size:12px;color:#8a7f6d;margin-top:5px;">${esc(d.verse_ref)}</span></p>`
+        : "",
+      p(`${greet(name)}today's work is one thing, not five.`),
+      `<p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#c8862e;">Today's rep</p>`,
+      p(`<strong style="color:#f7f1e6;">${esc(d.action)}</strong>`),
+      p(`Mark it done in the app when you have done it. The streak is not the point &mdash; but it will tell you the truth about your week.`),
+      d.is_monday ? p(`<strong style="color:#f7f1e6;">The room meets tonight, 7:00 PM ET.</strong>`) : "",
+    ].join(""), { label: "Log today's rep", url: APP }),
+  }),
+
   welcome_member: ({ name }) => ({
     subject: "Welcome to the Kingdom",
     html: shell("Welcome, brother", [
