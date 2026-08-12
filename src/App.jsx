@@ -3,13 +3,14 @@ import {
   Menu, X, Flame, ShieldCheck, BookOpen, CalendarCheck, Compass,
   Video, Upload, Square, Play, ChevronRight, ChevronDown, LogOut, User,
   CheckCircle2, Circle, Quote, ArrowRight, Lock, Mail, NotebookPen, Target,
-  Server, Dumbbell, LibraryBig, ExternalLink
+  Server, Dumbbell, LibraryBig, ExternalLink, Route
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Crest, Eyebrow, Btn, Card, firstName } from "./ui";
 import { AdminScreen, SystemsScreen, OWNER_NAV, SYSTEMS_SUB, ADMIN_TITLES } from "./admin";
 import { ScriptureGymApp } from "./scripturegym";
 import { PublicSharePage, JoinPage } from "./gymSessions";
+import { PathScreen } from "./path";
 
 /* ============================================================================
    KINGDOM OF DISCIPLINED MEN — Member App
@@ -206,6 +207,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
   // Members see The Forge, Scripture Gym and their profile until these open up.
   const items = [
     { id: "dashboard", label: "The Forge", icon: Flame },
+    { id: "path", label: "The Path", icon: Route },
     { id: "scripturegym", label: "Scripture Gym", icon: Dumbbell },
     ...(showCommand ? [
       { id: "p30", label: "30-Day Intensive", icon: ShieldCheck },
@@ -1293,7 +1295,7 @@ export default function App() {
   // programs and Daily Check-In as well as the Command section.
   const staff = isOwner && !previewMember;
   const STAFF_ONLY_VIEWS = ["p30", "p90", "checkin"];
-  const titles = { dashboard: "The Forge", scripturegym: "Scripture Gym", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", resources: "Resources", ...ADMIN_TITLES };
+  const titles = { dashboard: "The Forge", scripturegym: "Scripture Gym", p30: "30-Day Intensive", p90: "90-Day Curriculum", checkin: "Daily Check-In", profile: "Profile", resources: "Resources", path: "The Path", ...ADMIN_TITLES };
 
   const togglePreview = () => {
     setPreviewMember(p => {
@@ -1375,6 +1377,7 @@ export default function App() {
         )}
         {view === "profile" && <Profile user={user} streak={streak} checkins={checkins} />}
         {view === "resources" && <Resources />}
+        {view === "path" && <PathScreen />}
 
         {/* Owner Command + Systems (UI gate; RLS enforces at the DB regardless) */}
         {isOwner && !previewMember && (view.startsWith("admin_") || view === "gideon") && <AdminScreen view={view} profile={profile} />}
