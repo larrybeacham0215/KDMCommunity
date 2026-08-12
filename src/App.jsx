@@ -342,11 +342,25 @@ function Dashboard({ user, go, streak, progress, staff }) {
   // actually done something, then it retires itself — no dismiss button to
   // hunt for, and it comes back if he somehow ends up with nothing again.
   const [firstSteps, setFirstSteps] = useState(null);
+  const [today, setToday] = useState(null);
+  const [repBusy, setRepBusy] = useState(false);
+
+  const markRepDone = async () => {
+    if (repBusy || today?.rep_done) return;
+    setRepBusy(true);
+    // Optimistic: the tick should land the instant he taps it. If the write
+    // fails we reload and the truth wins.
+    setToday(t => ({ ...t, rep_done: true,
+      week: (t.week || []).map(d => d.is_today ? { ...d, done: true } : d) }));
+    const { error } = await supabase.rpc("complete_today_rep");
+    if (error) { const { data } = await supabase.rpc("get_today"); if (data) setToday(data); }
+    setRepBusy(false);
+  };
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [v, s, prog] = await Promise.all([
+      const [v, s, prog, td] = await Promise.all([
         supabase.rpc("verse_of_the_day"),
         supabase.from("gym_meetings")
           .select("id, title, scheduled_at, duration_minutes, cover_key, status, host_name, host:profiles!gym_meetings_host_id_fkey(full_name)")
@@ -356,9 +370,11 @@ function Dashboard({ user, go, streak, progress, staff }) {
         supabase.from("user_verse_progress")
           .select("status", { count: "exact", head: false })
           .eq("user_id", user.id),
+        supabase.rpc("get_today"),
       ]);
       if (!alive) return;
       if (v.data) setVerse(v.data);
+      if (td?.data) setToday(td.data);
       const rows = prog?.data || [];
       setFirstSteps({
         picked: rows.length > 0,
@@ -391,6 +407,99 @@ function Dashboard({ user, go, streak, progress, staff }) {
       <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 18px", textTransform: "capitalize" }}>
         Welcome back, {user.name}.
       </h2>
+
+      {/* ---- TODAY'S REP — the one thing. Everything else is below it. ---- */}
+      {today?.rep && (
+        <Card pad={0} style={{ marginBottom: 14, overflow: "hidden" }}>
+          <div style={{ padding: "20px 22px 18px",
+            background: today.rep_done
+              ? "linear-gradient(135deg, rgba(92,179,119,.10), transparent 70%)"
+              : "linear-gradient(135deg, rgba(200,134,46,.14), transparent 70%)" }}>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+              gap: 10, marginBottom: 10 }}>
+              <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".24em",
+                textTransform: "uppercase", color: today.rep_done ? "#5cb377" : T.bronze }}>
+                {today.rep_done ? "Today — done" : "Today's rep"}
+              </span>
+              <span style={{ fontFamily: T.reg, fontSize: 9.5, letterSpacing: ".16em",
+                textTransform: "uppercase", color: T.muted2, border: `1px solid ${T.lineSoft}`,
+                borderRadius: 20, padding: "3px 10px" }}>{today.rep.theme}</span>
+            </div>
+
+            <div style={{ fontFamily: T.display, fontSize: 24, color: T.cream,
+              lineHeight: 1.15, marginBottom: 10 }}>{today.rep.headline}</div>
+
+            {today.rep.verse_text && (
+              <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 15, lineHeight: 1.55,
+                color: T.bronzeLt, margin: "0 0 12px", paddingLeft: 12,
+                borderLeft: `2px solid ${T.lineSoft}` }}>
+                &ldquo;{today.rep.verse_text}&rdquo;
+                <span style={{ display: "block", fontStyle: "normal", fontFamily: T.reg,
+                  fontSize: 12, color: T.muted2, marginTop: 5 }}>{today.rep.verse_ref}</span>
+              </p>
+            )}
+
+            <p style={{ fontFamily: T.body, fontSize: 15, lineHeight: 1.6, color: T.cream,
+              margin: "0 0 16px" }}>{today.rep.action}</p>
+
+            <button onClick={markRepDone} disabled={today.rep_done || repBusy} style={{
+              display: "inline-flex", alignItems: "center", gap: 9, minHeight: 46,
+              padding: "13px 24px", borderRadius: 3, cursor: today.rep_done ? "default" : "pointer",
+              fontFamily: T.reg, fontSize: 12.5, fontWeight: 700, letterSpacing: ".1em",
+              textTransform: "uppercase",
+              background: today.rep_done ? "transparent" : T.gold,
+              color: today.rep_done ? "#5cb377" : "#1a1206",
+              border: today.rep_done ? "1px solid rgba(92,179,119,.45)" : "none",
+            }}>
+              {today.rep_done ? <><CheckCircle2 size={16} /> Rep logged</> : <>Mark it done</>}
+            </button>
+          </div>
+
+          {/* week strip — the reward half of the loop */}
+          {today.week?.length > 0 && (
+            <div style={{ display: "flex", gap: 6, padding: "13px 22px 15px",
+              borderTop: `1px solid ${T.lineSoft}`, alignItems: "center" }}>
+              {today.week.map((d, i) => (
+                <div key={i} style={{ flex: 1, textAlign: "center" }}>
+                  <div style={{
+                    height: 30, borderRadius: 3, marginBottom: 5,
+                    background: d.done ? T.gold : "transparent",
+                    border: `1px solid ${d.done ? T.gold : (d.is_today ? T.bronzeDim || "rgba(200,134,46,.5)" : T.lineSoft)}`,
+                  }} />
+                  <div style={{ fontFamily: T.reg, fontSize: 9.5, letterSpacing: ".08em",
+                    color: d.is_today ? T.bronzeLt : T.muted2 }}>{d.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ---- the verse he's mid-way through ---- */}
+      {today?.verse_in_progress && (
+        <Card pad={0} style={{ marginBottom: 14, overflow: "hidden", cursor: "pointer" }}
+          onClick={() => go("scripturegym")}>
+          <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: T.reg, fontSize: 10, letterSpacing: ".22em",
+                textTransform: "uppercase", color: T.muted2, marginBottom: 5 }}>Still learning</div>
+              <div style={{ fontFamily: T.serif, fontSize: 15.5, color: T.cream, lineHeight: 1.45,
+                overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                {today.verse_in_progress.verse_text}
+              </div>
+              <div style={{ fontFamily: T.reg, fontSize: 12, color: T.bronzeLt, marginTop: 5 }}>
+                {today.verse_in_progress.reference}
+              </div>
+            </div>
+            <span style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".1em",
+              textTransform: "uppercase", color: T.bronzeLt, whiteSpace: "nowrap",
+              display: "inline-flex", alignItems: "center", gap: 4 }}>
+              Train it <ChevronRight size={14} />
+            </span>
+          </div>
+        </Card>
+      )}
 
       {/* ---- Start Here: retires itself once he's training ---- */}
       {firstSteps && !firstSteps.memorized && (
