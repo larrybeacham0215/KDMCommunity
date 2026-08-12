@@ -1226,6 +1226,18 @@ export function ScriptureGymApp({ user, role, profile }) {
   // sessions layer inherits that masking rather than reading the raw profile.
   const gymProfile = { ...(profile || {}), role, gym_keys: isAdminOrOwner ? true : profile?.gym_keys };
 
+  /* PROGRESSIVE DISCLOSURE
+     A new man walking into a full commercial gym does one lap and leaves. He
+     should see one thing to start, and the rest of the equipment appears as he
+     earns it. Nothing is deleted — it unlocks.
+       new      : never trained. Official groups only, plus an explanation.
+       training : has shown up. Progress and the method guide appear.
+       seasoned : memorized at least one. Full Bible search and personal groups. */
+  const memorized = stats?.total_memorized ?? 0;
+  const hasTrained = memorized > 0 || !!stats?.last_session_date;
+  const level = memorized > 0 ? "seasoned" : hasTrained ? "training" : "new";
+  const isNew = level === "new";
+
   const load = useCallback(async () => {
     setLoading(true);
     const [groupsRes, statsRes] = await Promise.all([
@@ -1324,11 +1336,11 @@ export function ScriptureGymApp({ user, role, profile }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {SHOW.cohorts && isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
             {SHOW.cohorts && <Btn kind="ghost" onClick={() => setShowMyGroups(true)}><Users size={14} /> My Groups</Btn>}
-            <Btn kind="ghost" onClick={() => setShowBibleSearch(true)}><Search size={14} /> Search Bible</Btn>
+            {level === "seasoned" && <Btn kind="ghost" onClick={() => setShowBibleSearch(true)}><Search size={14} /> Search Bible</Btn>}
             {SHOW.proposals && isAdminOrOwner && <Btn kind="ghost" onClick={() => setShowProposeContent(true)}><Sparkles size={14} /> Propose Content</Btn>}
             {SHOW.leaderboard && <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>}
             <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
-            <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>
+            {!isNew && <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>}
             <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
           </div>
         } />
@@ -1336,6 +1348,50 @@ export function ScriptureGymApp({ user, role, profile }) {
       <GymTabs tab={tab} setTab={setTab} />
 
       {err && <ErrBox msg={err} />}
+
+      {!loading && isNew && (
+        <Card pad={0} style={{ marginBottom: 22, overflow: "hidden" }}>
+          <div style={{ padding: "22px 24px 20px",
+            background: "linear-gradient(135deg, rgba(200,134,46,.12), transparent 70%)" }}>
+            <div style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".24em",
+              textTransform: "uppercase", color: T.bronze, marginBottom: 8 }}>What this is</div>
+            <div style={{ fontFamily: T.display, fontSize: 24, color: T.cream, marginBottom: 12 }}>
+              A weight room for the Word
+            </div>
+            <p style={{ fontFamily: T.body, fontSize: 15, lineHeight: 1.65, color: T.muted,
+              margin: "0 0 8px" }}>
+              Most men know <em>about</em> the Bible. Fewer have it <em>in</em> them. There is a
+              difference between a verse you can look up and one that shows up uninvited — in the
+              argument, at the dinner table, at 11 PM when you are about to do something you will regret.
+            </p>
+            <p style={{ fontFamily: T.body, fontSize: 15, lineHeight: 1.65, color: T.muted,
+              margin: "0 0 18px" }}>
+              You cannot look up what you have not stored. So we train it like iron.
+            </p>
+
+            {[
+              ["Muscle groups", "Verses grouped by what they work — marriage, fatherhood, temper, purity. Pick the one that names your weakest area."],
+              ["Workouts", "Choose a few verses and drill them. Quiz yourself with the words hidden. Mark one memorized when it is actually in you."],
+              ["Monday nights", "The room meets at 7:00 PM ET. We study together, then you carry that week's verse into your own training."],
+            ].map(([h, b], i) => (
+              <div key={i} style={{ display: "flex", gap: 13, padding: "11px 0",
+                borderTop: `1px solid ${T.lineSoft}` }}>
+                <div style={{ width: 22, flex: "0 0 auto", fontFamily: T.reg, fontSize: 12,
+                  color: T.bronzeLt, paddingTop: 2 }}>{i + 1}</div>
+                <div>
+                  <div style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, marginBottom: 2 }}>{h}</div>
+                  <div style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted, lineHeight: 1.55 }}>{b}</div>
+                </div>
+              </div>
+            ))}
+
+            <p style={{ fontFamily: T.serif, fontStyle: "italic", fontSize: 14.5, color: T.bronzeLt,
+              margin: "16px 0 0" }}>
+              Start with one group below. Three verses is a real week's work.
+            </p>
+          </div>
+        </Card>
+      )}
 
       {!loading && computeNudge(stats) && (() => {
         const nudge = computeNudge(stats);
