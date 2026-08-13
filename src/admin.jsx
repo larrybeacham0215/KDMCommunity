@@ -7,12 +7,14 @@ import {
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Eyebrow, Btn, Card, inputBase, Field } from "./ui";
+import { Roster } from "./roster";
 
 /* ============================================================================
    COMMAND (owner-only) navigation + Systems sub-menu.
    Exported so the side menu in App.jsx can render them.
    ========================================================================== */
 export const OWNER_NAV = [
+  { id: "admin_roster", label: "The Roster", icon: ClipboardList },
   { id: "admin_users", label: "Members & Roles", icon: Users },
   { id: "admin_memories", label: "Memories", icon: Brain },
   { id: "admin_notepad", label: "Notepad", icon: NotebookPen },
@@ -33,6 +35,7 @@ export const SYSTEMS_SUB = [
 
 export const ADMIN_TITLES = {
   admin_users: "Members & Roles", admin_memories: "Memories", admin_notepad: "Notepad",
+  admin_roster: "The Roster",
   gideon: "Gideon AI", admin_robots: "Robots", admin_constitution: "AI Constitution",
   admin_scripture_gym: "Scripture Gym",
   systems: "Systems", sys_overview: "Systems · Overview", sys_integrations: "Systems · Integrations",
@@ -818,6 +821,7 @@ function VerseEditor({ group, profile, onBack }) {
    ADMIN ROUTER
    ========================================================================= */
 export function AdminScreen({ view, profile }) {
+  if (view === "admin_roster") return <Roster />;
   if (view === "admin_users") return <AdminUsers profile={profile} />;
   if (view === "admin_memories") return <Memories profile={profile} />;
   if (view === "admin_notepad") return <Notepad profile={profile} />;

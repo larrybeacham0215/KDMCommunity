@@ -345,6 +345,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
   // hunt for, and it comes back if he somehow ends up with nothing again.
   const [firstSteps, setFirstSteps] = useState(null);
   const [today, setToday] = useState(null);
+  const [partner, setPartner] = useState(null);
   const [repBusy, setRepBusy] = useState(false);
 
   const startWeekVerse = async () => {
@@ -368,7 +369,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [v, s, prog, td] = await Promise.all([
+      const [v, s, prog, td, pw] = await Promise.all([
         supabase.rpc("verse_of_the_day"),
         supabase.from("gym_meetings")
           .select("id, title, scheduled_at, duration_minutes, cover_key, status, host_name, host_id")
@@ -379,10 +380,12 @@ function Dashboard({ user, go, streak, progress, staff }) {
           .select("status", { count: "exact", head: false })
           .eq("user_id", user.id),
         supabase.rpc("get_today"),
+        supabase.rpc("get_partner_week"),
       ]);
       if (!alive) return;
       if (v.data) setVerse(v.data);
       if (td?.data) setToday(td.data);
+      if (pw?.data) setPartner(pw.data);
       // profiles is RLS-locked to your own row, so host names must come from
       // member_directory or every card reads "Host to be named" for members.
       if (s.data?.length) {
@@ -494,6 +497,65 @@ function Dashboard({ user, go, streak, progress, staff }) {
               ))}
             </div>
           )}
+        </Card>
+      )}
+
+      {/* ---- YOUR BROTHER — the whole point of accountability is that
+             somebody sees. Assigned by Larry, mutual in both directions. ---- */}
+      {partner?.name && (
+        <Card pad={0} style={{ marginBottom: 14, overflow: "hidden" }}>
+          <div style={{ padding: "17px 20px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between",
+              alignItems: "baseline", gap: 10, marginBottom: 11, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".24em",
+                textTransform: "uppercase", color: T.bronze }}>Your brother</span>
+              <span style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted2 }}>
+                {partner.reps_7d} of 7 this week
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 12 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: "50%", flex: "0 0 auto",
+                border: `1px solid ${T.line}`, background: T.surface2,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: T.display, fontSize: 15, color: T.bronze,
+              }}>{(partner.name[0] || "?").toUpperCase()}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: T.serif, fontSize: 16.5, color: T.cream }}>{partner.name}</div>
+                <div style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted }}>
+                  {partner.days_quiet === null
+                    ? "Hasn't started yet — reach out."
+                    : partner.days_quiet === 0 ? "Trained today."
+                    : partner.days_quiet <= 2 ? `Last trained ${partner.days_quiet}d ago.`
+                    : `Quiet ${partner.days_quiet} days. Check on him.`}
+                </div>
+              </div>
+            </div>
+
+            {partner.week?.length > 0 && (
+              <div style={{ display: "flex", gap: 5 }}>
+                {partner.week.map((d, i) => (
+                  <div key={i} style={{ flex: 1, textAlign: "center" }}>
+                    <div style={{
+                      height: 22, borderRadius: 3, marginBottom: 4,
+                      background: d.done ? T.gold : "transparent",
+                      border: `1px solid ${d.done ? T.gold : (d.is_today ? T.bronze : T.lineSoft)}`,
+                    }} />
+                    <div style={{ fontFamily: T.reg, fontSize: 9,
+                      color: d.is_today ? T.bronzeLt : T.muted2 }}>{d.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(partner.days_quiet === null || partner.days_quiet >= 3) && (
+              <p style={{ fontFamily: T.body, fontSize: 13, color: T.muted,
+                margin: "13px 0 0", paddingTop: 12, borderTop: `1px solid ${T.lineSoft}` }}>
+                Anything a man only does alone, he eventually stops doing. Send him a message.
+              </p>
+            )}
+          </div>
         </Card>
       )}
 
