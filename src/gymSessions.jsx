@@ -532,7 +532,13 @@ export function GymSessions({ user, profile }) {
       onDone={(m) => { setMode("list"); load(); setOpenId(m?.id || null); }} />
   );
 
-  const open    = rows.filter(r => ["approved", "completed"].includes(r.status));
+  /* Only the next Open Gym is shown. Past sessions are not archived here — a
+     list of rooms a man has already missed is discouragement, not information.
+     Future weeks still exist and their share links still work; they are simply
+     not listed until they are the next one up. */
+  const open    = rows
+    .filter(r => r.status === "approved" && (!r.scheduled_at || new Date(r.scheduled_at) > new Date(Date.now() - 36e5)))
+    .slice(0, 1);
   const pending = rows.filter(r => r.status === "pending");
   const mine    = rows.filter(r => r.created_by === user.id && ["draft", "rejected"].includes(r.status));
   const approver = isApprover(profile);
@@ -562,7 +568,7 @@ export function GymSessions({ user, profile }) {
             <SessionGrid items={mine} onOpen={setOpenId} />
           </>)}
 
-          <Sub>Open workouts</Sub>
+          <Sub>Next in the gym</Sub>
           {open.length === 0 ? (
             <Card pad={26}>
               <div style={{ fontFamily: T.serif, fontSize: 19, color: T.cream, marginBottom: 6 }}>

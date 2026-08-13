@@ -397,7 +397,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
           .select("id, title, scheduled_at, duration_minutes, cover_key, status, host_name, host_id")
           .eq("status", "approved")
           .order("scheduled_at", { ascending: true })
-          .limit(3),
+          .limit(1),
         supabase.from("user_verse_progress")
           .select("status", { count: "exact", head: false })
           .eq("user_id", user.id),
@@ -811,7 +811,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
       {/* ---- what's live in the Gym ---- */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "26px 0 12px" }}>
         <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".26em",
-          textTransform: "uppercase", color: T.muted2 }}>In the gym</span>
+          textTransform: "uppercase", color: T.muted2 }}>Next in the gym</span>
         <span onClick={() => go("scripturegym")} style={{ fontFamily: T.reg, fontSize: 12,
           color: T.bronzeLt, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
           See all <ChevronRight size={13} />
