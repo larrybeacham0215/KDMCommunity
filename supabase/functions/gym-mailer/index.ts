@@ -426,6 +426,38 @@ const TEMPLATES: Record<string, (c: Ctx) => { subject: string; html: string }> =
     ].join(""), { label: "Log today's rep", url: APP }),
   }),
 
+  /* ---- THE FOXHOLE ----
+     Sent to BOTH men the moment Larry digs a foxhole. It confirms what he said
+     out loud in the room rather than surprising a man with a stranger's week on
+     his home screen. Carries the first-Polo script, because "just send a video"
+     is exactly where men freeze. ---- */
+  foxhole_assigned: ({ d, name }) => ({
+    subject: `You're in a foxhole with ${d.brother_name}`,
+    html: shell("You've got a brother", [
+      p(`${greet(name)}you're paired with <strong style="color:#f7f1e6;">${esc(d.brother_name)}</strong>.`),
+      p("A foxhole is two men who check in with each other every day by video. Marco Polo, sixty seconds, your face &mdash; not a text. He sees your week and you see his, and neither of you gets to quietly disappear."),
+      `<p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#c8862e;">Your first Polo</p>`,
+      p("Do not overthink it. Say your name. One true thing about your week. One thing you're working on. That is the whole script."),
+      p("<em style=\"color:#c8862e;\">Every man who has ever done this felt stupid sending the first one. It is awkward for about four days, and then it isn't.</em>"),
+      p(`This is not a Bible study. It is a check-in. Eight weeks, then we'll ask honestly whether it's working &mdash; nobody is stuck with anybody.`),
+      p(`<strong style="color:#f7f1e6;">Send him one today, ${esc(name || "brother")}. Then mark it in the app so he can see you did.</strong>`),
+    ].join(""), { label: "Open the app", url: APP }),
+  }),
+
+  /* Fires once when a man's brother has been silent three days. Deliberately
+     addressed to the man still showing up, because he is the one who can still
+     do something about it — and because he is the one most likely to quietly
+     conclude this does not work. */
+  foxhole_brother_quiet: ({ d, name }) => ({
+    subject: `${d.brother_name} has gone quiet`,
+    html: shell("Go get him", [
+      p(`${greet(name)}<strong style="color:#f7f1e6;">${esc(d.brother_name)}</strong> hasn't checked in for ${esc(d.silent_days)} days.`),
+      p("You do not need to wait for Larry, and you do not need the right words. Send him a Polo and ask how he is. That is the entire job."),
+      p("A man who goes quiet is usually not lazy. He is usually ashamed, or buried, or both &mdash; and the longer nobody asks, the harder it gets to come back."),
+      p(`<strong style="color:#f7f1e6;">You've kept showing up, ${esc(name || "brother")}. Don't stop because he did. Go get him.</strong>`),
+    ].join(""), { label: "Open the app", url: APP }),
+  }),
+
   welcome_member: ({ name }) => ({
     subject: "Welcome to the Kingdom",
     html: shell("Welcome, brother", [
