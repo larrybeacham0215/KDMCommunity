@@ -3,7 +3,7 @@ import {
   Users, Brain, NotebookPen, Bot, Cpu, ScrollText, Plug, Workflow, Webhook,
   KeyRound, Activity, LayoutGrid, Plus, Trash2, Save, RefreshCw, Power,
   Send, Shield, Sparkles, ChevronRight, ChevronLeft, X, AlertTriangle, Circle, CheckCircle2,
-  Dumbbell, Pencil,
+  Dumbbell, Pencil, ClipboardList,
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Eyebrow, Btn, Card, inputBase, Field } from "./ui";
