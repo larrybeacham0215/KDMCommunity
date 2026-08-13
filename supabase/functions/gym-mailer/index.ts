@@ -22,9 +22,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SITE = "https://kdmcommunity.com";
 const APP = `${SITE}/app/`;
 const FROM = { email: "welcome@kdmcommunity.com", name: "Kingdom of Disciplined Men" };
-// welcome@ is send-only — kdmcommunity.com has no MX records, so anything sent
-// back to it disappears silently. Point replies at a mailbox that exists.
-const REPLY_TO = { email: "larrybeacham@gmail.com", name: "Larry Beacham" };
+// The domain can receive mail as of 13 Aug 2026 (MX -> Microsoft 365). Replies
+// now land on the Kingdom's own mailbox rather than a personal Gmail.
+// FROM stays welcome@ because that is the voice of the app; REPLY_TO is larry@
+// because that is the mailbox a man actually reaches.
+const REPLY_TO = { email: "larry@kdmcommunity.com", name: "Larry Beacham" };
 
 // The Scripture Gym room. Read live from scripture_gym_content.gym_join_url on
 // every invocation (see resolveRoom below) so changing the link in the database
