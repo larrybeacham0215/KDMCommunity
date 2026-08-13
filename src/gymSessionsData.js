@@ -246,3 +246,29 @@ export async function fetchCurriculumVerses() {
   const rows = (data || []).filter(v => v.muscle_group?.owner_type === "official");
   return { data: rows, error };
 }
+
+
+/* ---------------------------------------------------------------------------
+   MARCO POLO
+   Verified against marcopolo.me/.well-known/apple-app-site-association and
+   assetlinks.json: the app registers universal links (iOS, appID
+   6L379HCV5Q.co.happybits.marcopolo) and Android app links for
+   /mp/chats/, /mp/chat/*, /groups/* and others.
+
+   That is why we use an https link rather than a marcopolo:// scheme — a
+   universal link opens the app when installed and quietly falls back to the
+   website when it is not. A custom scheme would give a dead button to any man
+   who has not installed it yet.
+   ------------------------------------------------------------------------- */
+export const MARCO_POLO_CHATS = "https://marcopolo.me/mp/chats/";
+
+/** A man can paste his own foxhole thread; anything else falls back to chats. */
+export function marcoPoloUrl(link) {
+  const raw = String(link || "").trim();
+  if (!raw) return MARCO_POLO_CHATS;
+  try {
+    const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+    if (u.hostname.endsWith("marcopolo.me")) return u.toString();
+  } catch { /* not a URL — ignore it */ }
+  return MARCO_POLO_CHATS;
+}

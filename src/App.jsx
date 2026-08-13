@@ -6,10 +6,11 @@ import {
   Server, Dumbbell, LibraryBig, ExternalLink, Route
 } from "lucide-react";
 import { supabase } from "./dataService";
-import { T, Crest, Eyebrow, Btn, Card, firstName } from "./ui";
+import { T, Crest, Eyebrow, Btn, Card, Field, inputBase, firstName } from "./ui";
 import { AdminScreen, SystemsScreen, OWNER_NAV, SYSTEMS_SUB, ADMIN_TITLES } from "./admin";
 import { ScriptureGymApp } from "./scripturegym";
 import { PublicSharePage, JoinPage } from "./gymSessions";
+import { marcoPoloUrl } from "./gymSessionsData";
 import { PathScreen } from "./path";
 
 /* ============================================================================
@@ -348,6 +349,15 @@ function Dashboard({ user, go, streak, progress, staff }) {
   const [partner, setPartner] = useState(null);
   const [repBusy, setRepBusy] = useState(false);
   const [checkinBusy, setCheckinBusy] = useState(false);
+  const [linkEdit, setLinkEdit] = useState(false);
+  const [linkVal, setLinkVal] = useState("");
+
+  const saveFoxholeLink = async () => {
+    await supabase.rpc("set_foxhole_link", { p_link: linkVal });
+    const { data } = await supabase.rpc("get_foxhole");
+    if (data) setPartner(data);
+    setLinkEdit(false);
+  };
 
   const startWeekVerse = async () => {
     const { error } = await supabase.rpc("start_week_verse");
@@ -571,6 +581,42 @@ function Dashboard({ user, go, streak, progress, staff }) {
                   ? <><CheckCircle2 size={16} /> Polo sent today</>
                   : <><Video size={15} /> I sent my Polo</>}
               </button>
+
+              <a href={marcoPoloUrl(partner.marco_polo_link)}
+                 target="_blank" rel="noopener noreferrer"
+                 style={{
+                   display: "inline-flex", alignItems: "center", gap: 8, minHeight: 46,
+                   marginLeft: 10, padding: "12px 20px", borderRadius: 3, textDecoration: "none",
+                   fontFamily: T.reg, fontSize: 12, fontWeight: 700, letterSpacing: ".1em",
+                   textTransform: "uppercase", color: T.bronzeLt,
+                   border: `1px solid ${T.line}`,
+                 }}>
+                <Video size={15} /> Open Marco Polo
+              </a>
+
+              {linkEdit ? (
+                <div style={{ marginTop: 12 }}>
+                  <Field label="Paste your foxhole's Marco Polo link" />
+                  <input style={{ ...inputBase, marginBottom: 9 }} value={linkVal}
+                    onChange={e => setLinkVal(e.target.value)}
+                    placeholder="https://marcopolo.me/mp/chat/…" />
+                  <div style={{ display: "flex", gap: 9 }}>
+                    <Btn onClick={saveFoxholeLink}>Save</Btn>
+                    <Btn kind="ghost" onClick={() => setLinkEdit(false)}>Cancel</Btn>
+                  </div>
+                  <p style={{ fontFamily: T.body, fontSize: 12, color: T.muted2, margin: "9px 0 0" }}>
+                    In Marco Polo, open your chat with him, tap share, and copy the link.
+                    Leave it blank and the button just opens your chat list.
+                  </p>
+                </div>
+              ) : (
+                <button onClick={() => { setLinkVal(partner.marco_polo_link || ""); setLinkEdit(true); }}
+                  style={{ background: "none", border: "none", padding: "8px 0 0", cursor: "pointer",
+                    fontFamily: T.body, fontSize: 12.5, color: T.muted2, textDecoration: "underline",
+                    display: "block" }}>
+                  {partner.marco_polo_link ? "Change the foxhole link" : "Save your foxhole's Marco Polo link"}
+                </button>
+              )}
 
               <p style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted, margin: "11px 0 0", lineHeight: 1.55 }}>
                 {partner.his_silent_days === null
