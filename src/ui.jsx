@@ -1,27 +1,37 @@
 import React from "react";
 
 /* Shared design tokens — Larry Beacham brand (obsidian / bronze / ember). */
+/* ---------------------------------------------------------------------------
+   DESIGN TOKENS — light theme ("the forge in daylight"), matching the homepage.
+
+   NAMING NOTE: these keys were written for the original dark theme and are kept
+   so the ~6,000 lines that reference them keep working. Read them by ROLE, not
+   by name: `obsidian` is the page ground, `cream` is the primary text colour.
+   Flipping the values here flips the entire app.
+   ------------------------------------------------------------------------- */
 export const T = {
-  obsidian: "#0a0907",
-  obsidian2: "#100e0b",
-  surface: "#16130d",
-  surface2: "#1e1810",
-  line: "rgba(216,168,92,.18)",
-  lineSoft: "rgba(216,168,92,.10)",
-  bronze: "#c8862e",
-  bronzeLt: "#f1c878",
-  bronzeGlow: "#e7ab4c",
-  ember: "#9a2d16",
-  emberLt: "#d4502b",
-  emberHot: "#ff6a3c",
-  cream: "#f7f1e6",
-  muted: "#a99d89",
-  muted2: "#6e6557",
-  gold: "linear-gradient(120deg,#f6d488 0%,#c8862e 45%,#d4502b 100%)",
-  reg: "'Cinzel',Georgia,serif",
+  obsidian:  "#F8F7F4",              // page ground — bone paper
+  obsidian2: "#EEEBE4",              // alternating band — limestone
+  surface:   "#FDFCFA",              // card
+  surface2:  "#F3F1EA",              // recessed card
+  line:      "#DDD8CE",              // hairline rule
+  lineSoft:  "#E7E3D9",              // faintest rule
+  bronze:    "#9C6A24",              // accent — darkened for contrast on light
+  bronzeLt:  "#B8802E",
+  bronzeGlow:"#C08B3A",
+  ember:     "#A8462C",              // streak / heat
+  emberLt:   "#B4553F",
+  emberHot:  "#C2542E",
+  cream:     "#1A1D21",              // PRIMARY TEXT — graphite, not cream
+  muted:     "#565E68",              // secondary text — steel
+  muted2:    "#8A8578",              // tertiary / captions
+  gold:      "#9C6A24",              // solid, matching the homepage button
+  onGold:    "#FCFAF6",              // text that sits on a gold fill
+  ok:        "#3F7D57",              // success, legible on paper
+  reg:   "'Manrope',system-ui,sans-serif",
   display: "'Anton',Impact,sans-serif",
   serif: "'Fraunces',Georgia,serif",
-  body: "'Hanken Grotesk',system-ui,sans-serif",
+  body:  "'Manrope',system-ui,sans-serif",
 };
 
 export function Crest({ size = 40 }) {
@@ -29,9 +39,9 @@ export function Crest({ size = 40 }) {
     <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden>
       <defs>
         <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f6d488" />
-          <stop offset=".5" stopColor="#c8862e" />
-          <stop offset="1" stopColor="#d4502b" />
+          <stop offset="0" stopColor="#B8802E" />
+          <stop offset=".5" stopColor="#9C6A24" />
+          <stop offset="1" stopColor="#A8462C" />
         </linearGradient>
       </defs>
       <path d="M32 3 L57 13 V31 C57 47 46 56 32 61 C18 56 7 47 7 31 V13 Z"
@@ -61,7 +71,7 @@ export function Btn({ children, onClick, kind = "solid", full, type = "button", 
     transition: "transform .15s, filter .2s", opacity: disabled ? .5 : 1,
   };
   const styles = kind === "solid"
-    ? { ...base, background: T.gold, color: "#1a1206", boxShadow: "0 6px 26px rgba(200,134,46,.28)" }
+    ? { ...base, background: T.gold, color: "#FCFAF6", boxShadow: "0 6px 26px rgba(200,134,46,.28)" }
     : { ...base, background: "transparent", color: T.bronzeLt, border: `1px solid ${T.line}` };
   return (
     <button type={type} onClick={onClick} disabled={disabled} style={styles}

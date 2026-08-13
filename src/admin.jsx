@@ -145,7 +145,7 @@ function AdminUsers({ profile }) {
             <Card key={u.id} pad={16} style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
               <div style={{
                 width: 40, height: 40, borderRadius: "50%", background: T.gold, flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center", color: "#1a1206",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#FCFAF6",
                 fontFamily: T.reg, fontWeight: 700,
               }}>{(u.full_name?.[0] || u.email?.[0] || "M").toUpperCase()}</div>
               <div style={{ flex: 1, minWidth: 160 }}>
@@ -158,7 +158,7 @@ function AdminUsers({ profile }) {
               <span style={{
                 fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".12em", textTransform: "uppercase",
                 padding: "5px 10px", borderRadius: 2,
-                color: u.role === "owner" ? "#1a1206" : T.bronzeLt,
+                color: u.role === "owner" ? "#FCFAF6" : T.bronzeLt,
                 background: u.role === "owner" ? T.gold : "transparent",
                 border: `1px solid ${u.role === "owner" ? "transparent" : T.line}`,
               }}>{ROLE_LABELS[u.role] || "Member"}</span>
@@ -375,7 +375,7 @@ function Gideon() {
       {/* online status */}
       <Card pad={14} style={{ marginBottom: 16, borderColor: "rgba(231,171,76,.3)" }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#7bbf6a", boxShadow: "0 0 8px #7bbf6a", flexShrink: 0 }} />
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#3F7D57", boxShadow: "0 0 8px #3F7D57", flexShrink: 0 }} />
           <span style={{ fontFamily: T.body, fontSize: 13, color: T.cream }}>
             Gideon is <b style={{ color: T.bronzeLt }}>online</b> — running on the Anthropic API through a secure Supabase edge function. The key stays server-side.
           </span>
@@ -386,7 +386,7 @@ function Gideon() {
       {loading ? <Loading /> : gideon && (
         <Card pad={18} style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 10, background: "radial-gradient(circle,rgba(231,171,76,.25),transparent 70%)", border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 46, height: 46, borderRadius: 10, background: "radial-gradient(circle,rgba(156,106,36,.16),transparent 70%)", border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Bot size={24} color={T.bronzeLt} />
             </div>
             <div style={{ flex: 1 }}>
@@ -835,7 +835,7 @@ const PlaceholderModule = ({ icon: Icon, title, blurb, ideas }) => (
   <Wrap>
     <Head kicker="Systems" title={title} sub={blurb} />
     <Card pad={22} style={{ textAlign: "center", marginBottom: 14 }}>
-      <div style={{ width: 54, height: 54, margin: "0 auto 12px", borderRadius: 12, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(circle,rgba(231,171,76,.12),transparent 70%)" }}>
+      <div style={{ width: 54, height: 54, margin: "0 auto 12px", borderRadius: 12, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(circle,rgba(156,106,36,.10),transparent 70%)" }}>
         <Icon size={26} color={T.bronzeLt} />
       </div>
       <div style={{ fontFamily: T.reg, fontSize: 12, letterSpacing: ".16em", textTransform: "uppercase", color: T.muted }}>Not connected yet</div>

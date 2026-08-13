@@ -18,10 +18,10 @@ import {
    ========================================================================= */
 
 const TONE = {
-  ok:    { fg: "#5cb377", bd: "rgba(92,179,119,.42)", bg: "rgba(92,179,119,.13)" },
+  ok:    { fg: "#2F6B49", bd: "rgba(47,107,73,.38)", bg: "rgba(47,107,73,.09)" },
   warn:  { fg: T.bronzeLt, bd: "rgba(200,134,46,.45)", bg: "rgba(200,134,46,.13)" },
   stop:  { fg: T.emberHot, bd: "rgba(212,80,43,.45)",  bg: "rgba(212,80,43,.13)" },
-  info:  { fg: "#8cbde0",  bd: "rgba(74,127,166,.45)", bg: "rgba(74,127,166,.13)" },
+  info:  { fg: "#2F6C99",  bd: "rgba(47,108,153,.38)", bg: "rgba(47,108,153,.10)" },
   muted: { fg: T.muted2,   bd: T.lineSoft,             bg: "transparent" },
 };
 
@@ -42,7 +42,7 @@ const Cover = ({ ck, h = 84, children }) => (
     height: h, background: (COVERS[ck] || COVERS.iron).grad,
     display: "flex", alignItems: "center", justifyContent: "center",
     fontFamily: T.reg, fontSize: 10, letterSpacing: ".3em", textTransform: "uppercase",
-    color: "rgba(247,241,230,.42)", borderBottom: `1px solid ${T.lineSoft}`,
+    color: "rgba(247,241,230,.78)", borderBottom: `1px solid ${T.line}`,
   }}>{children || (COVERS[ck] || COVERS.iron).label}</div>
 );
 
@@ -287,7 +287,7 @@ function InviteDialog({ user, onClose }) {
 
   return (
     <div onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", zIndex: 90,
+      position: "fixed", inset: 0, background: "rgba(26,29,33,.48)", zIndex: 90,
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
     }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 440 }}>

@@ -76,7 +76,7 @@ function Login() {
 
   return (
     <div style={{
-      minHeight: "100vh", background: `radial-gradient(120% 80% at 50% -10%, #1c140a 0%, ${T.obsidian} 55%)`,
+      minHeight: "100vh", background: `radial-gradient(120% 80% at 50% -10%, ${T.obsidian2} 0%, ${T.obsidian} 55%)`,
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
     }}>
       <div style={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
@@ -245,7 +245,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
   return (
     <>
       <div onClick={onClose} style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 40,
+        position: "fixed", inset: 0, background: "rgba(26,29,33,.42)", zIndex: 40,
         opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none", transition: "opacity .25s",
       }} />
       <aside style={{
@@ -315,7 +315,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
           <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: "50%", background: T.gold, display: "flex",
-              alignItems: "center", justifyContent: "center", color: "#1a1206", fontFamily: T.reg, fontWeight: 700,
+              alignItems: "center", justifyContent: "center", color: "#FCFAF6", fontFamily: T.reg, fontWeight: 700,
             }}>{(user.name[0] || "M").toUpperCase()}</div>
             <div style={{ overflow: "hidden" }}>
               <div style={{ fontFamily: T.body, fontSize: 13, color: T.cream, textTransform: "capitalize" }}>{user.name}{showCommand && <span style={{ color: T.bronze, fontSize: 10, letterSpacing: ".1em", marginLeft: 6 }}>OWNER</span>}</div>
@@ -421,13 +421,13 @@ function Dashboard({ user, go, streak, progress, staff }) {
         <Card pad={0} style={{ marginBottom: 14, overflow: "hidden" }}>
           <div style={{ padding: "20px 22px 18px",
             background: today.rep_done
-              ? "linear-gradient(135deg, rgba(92,179,119,.10), transparent 70%)"
+              ? "linear-gradient(135deg, rgba(63,125,87,.08), transparent 70%)"
               : "linear-gradient(135deg, rgba(200,134,46,.14), transparent 70%)" }}>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
               gap: 10, marginBottom: 10 }}>
               <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".24em",
-                textTransform: "uppercase", color: today.rep_done ? "#5cb377" : T.bronze }}>
+                textTransform: "uppercase", color: today.rep_done ? "#3F7D57" : T.bronze }}>
                 {today.rep_done ? "Today — done" : "Today's rep"}
               </span>
               <span style={{ fontFamily: T.reg, fontSize: 9.5, letterSpacing: ".16em",
@@ -457,8 +457,8 @@ function Dashboard({ user, go, streak, progress, staff }) {
               fontFamily: T.reg, fontSize: 12.5, fontWeight: 700, letterSpacing: ".1em",
               textTransform: "uppercase",
               background: today.rep_done ? "transparent" : T.gold,
-              color: today.rep_done ? "#5cb377" : "#1a1206",
-              border: today.rep_done ? "1px solid rgba(92,179,119,.45)" : "none",
+              color: today.rep_done ? "#3F7D57" : "#FCFAF6",
+              border: today.rep_done ? "1px solid rgba(63,125,87,.4)" : "none",
             }}>
               {today.rep_done ? <><CheckCircle2 size={16} /> Rep logged</> : <>Mark it done</>}
             </button>
@@ -514,7 +514,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
 
             {today.week_verse.memorized ? (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8,
-                color: "#5cb377", fontFamily: T.reg, fontSize: 12.5, letterSpacing: ".08em",
+                color: "#3F7D57", fontFamily: T.reg, fontSize: 12.5, letterSpacing: ".08em",
                 textTransform: "uppercase" }}>
                 <CheckCircle2 size={16} /> Memorized
               </div>
@@ -525,7 +525,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
                 fontFamily: T.reg, fontSize: 12, fontWeight: 700, letterSpacing: ".1em",
                 textTransform: "uppercase",
                 background: today.week_verse.started ? "transparent" : T.gold,
-                color: today.week_verse.started ? T.bronzeLt : "#1a1206",
+                color: today.week_verse.started ? T.bronzeLt : "#FCFAF6",
                 border: today.week_verse.started ? `1px solid ${T.line}` : "none",
               }}>
                 {today.week_verse.started ? "Keep training it" : "Train this verse"}
@@ -718,7 +718,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
         <div style={{
           width: 46, height: 46, borderRadius: "50%", border: `1px solid ${T.line}`,
           display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto",
-          background: "radial-gradient(circle, rgba(255,106,60,.22), transparent 70%)",
+          background: "radial-gradient(circle, rgba(194,84,46,.14), transparent 70%)",
         }}><Flame size={22} color={T.emberHot} /></div>
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: T.display, fontSize: 23, color: T.cream, lineHeight: 1 }}>
@@ -1150,7 +1150,7 @@ function ResourceCard({ r, go }) {
           marginTop: 16, display: "inline-flex", alignItems: "center", gap: 8, minHeight: 44,
           padding: "12px 22px", borderRadius: 3, cursor: "pointer",
           background: r.internal_view ? "transparent" : T.gold,
-          color: r.internal_view ? T.bronzeLt : "#1a1206",
+          color: r.internal_view ? T.bronzeLt : "#FCFAF6",
           border: r.internal_view ? `1px solid ${T.line}` : "none",
           fontFamily: T.reg, fontSize: 12, fontWeight: 700, letterSpacing: ".1em",
           textTransform: "uppercase",
@@ -1212,7 +1212,7 @@ function Profile({ user, streak, checkins }) {
       <Eyebrow>Your Standing</Eyebrow>
       <h2 style={{ fontFamily: T.display, fontSize: 30, color: T.cream, margin: "10px 0 18px" }}>My Profile</h2>
       <Card pad={22} style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-        <div style={{ width: 60, height: 60, borderRadius: "50%", background: T.gold, display: "flex", alignItems: "center", justifyContent: "center", color: "#1a1206", fontFamily: T.display, fontSize: 26 }}>
+        <div style={{ width: 60, height: 60, borderRadius: "50%", background: T.gold, display: "flex", alignItems: "center", justifyContent: "center", color: "#FCFAF6", fontFamily: T.display, fontSize: 26 }}>
           {(user.name[0] || "M").toUpperCase()}
         </div>
         <div>
@@ -1285,7 +1285,7 @@ export default function App() {
   useEffect(() => {
     const l = document.createElement("link");
     l.rel = "stylesheet";
-    l.href = "https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Anton&family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Hanken+Grotesk:wght@300;400;500;600;700;800&display=swap";
+    l.href = "https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap";
     document.head.appendChild(l);
     const s = document.createElement("style");
     s.textContent = "@keyframes kpulse{0%,100%{opacity:1}50%{opacity:.3}}*{box-sizing:border-box}::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:rgba(200,134,46,.3);border-radius:4px}";
@@ -1335,11 +1335,11 @@ export default function App() {
           display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
           padding: "9px 16px", background: T.bronze, borderBottom: `1px solid ${T.line}`,
         }}>
-          <span style={{ fontFamily: T.reg, fontSize: 12.5, color: "#1a1206", fontWeight: 700, letterSpacing: ".03em" }}>
+          <span style={{ fontFamily: T.reg, fontSize: 12.5, color: "#FCFAF6", fontWeight: 700, letterSpacing: ".03em" }}>
             👁 PREVIEWING AS MEMBER
           </span>
           <button onClick={togglePreview} style={{
-            background: "rgba(10,9,7,.2)", border: "none", borderRadius: 3, color: "#1a1206",
+            background: "rgba(10,9,7,.2)", border: "none", borderRadius: 3, color: "#FCFAF6",
             fontFamily: T.reg, fontSize: 11.5, fontWeight: 700, padding: "4px 10px", cursor: "pointer",
           }}>Exit Preview</button>
         </div>
@@ -1366,7 +1366,7 @@ export default function App() {
       {/* top bar */}
       <header style={{
         position: "sticky", top: 0, zIndex: 30, display: "flex", alignItems: "center", gap: 14,
-        padding: "14px 18px", background: "rgba(10,9,7,.86)", backdropFilter: "blur(10px)",
+        padding: "14px 18px", background: "rgba(248,247,244,.88)", backdropFilter: "blur(10px)",
         borderBottom: `1px solid ${T.line}`,
       }}>
         <button onClick={() => setMenu(true)} style={{ background: "none", border: "none", color: T.bronzeLt, cursor: "pointer" }}><Menu size={24} /></button>

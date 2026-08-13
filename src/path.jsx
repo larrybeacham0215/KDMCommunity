@@ -34,9 +34,9 @@ function WeekRow({ w, open, onToggle, onComplete, busy }) {
         <div style={{
           width: 34, height: 34, borderRadius: "50%", flex: "0 0 auto",
           display: "flex", alignItems: "center", justifyContent: "center",
-          border: `1px solid ${w.done ? "rgba(92,179,119,.5)" : tone.bd}`,
-          background: w.done ? "rgba(92,179,119,.14)" : "transparent",
-          color: w.done ? "#5cb377" : tone.fg,
+          border: `1px solid ${w.done ? "rgba(63,125,87,.45)" : tone.bd}`,
+          background: w.done ? "rgba(63,125,87,.10)" : "transparent",
+          color: w.done ? "#3F7D57" : tone.fg,
           fontFamily: T.reg, fontSize: 13, fontWeight: 700,
         }}>
           {w.done ? <CheckCircle2 size={17} /> : w.state === "locked" ? <Lock size={14} /> : w.week_number}
@@ -84,7 +84,7 @@ function WeekRow({ w, open, onToggle, onComplete, busy }) {
             color: T.cream, margin: "0 0 18px" }}>{w.question}</p>
 
           {w.done ? (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#5cb377",
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#3F7D57",
               fontFamily: T.reg, fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase" }}>
               <CheckCircle2 size={16} /> Week complete
             </div>
@@ -182,7 +182,7 @@ export function PathScreen() {
               {weeks.map(w => (
                 <div key={w.week_number} style={{
                   flex: 1, height: 6, borderRadius: 2,
-                  background: w.done ? "#5cb377"
+                  background: w.done ? "#3F7D57"
                     : w.week_number === cur ? T.gold
                     : w.week_number < cur ? "rgba(200,134,46,.32)" : T.lineSoft,
                 }} />

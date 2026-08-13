@@ -9,10 +9,13 @@ import { supabase } from "./dataService";
    group meetings, namespaced `gym_meetings*` so the two never collide.
    ========================================================================== */
 
+/* Cover swatches stay dark on purpose. Against bone paper they read as pieces
+   of forged metal and give the cards something to hold onto without needing
+   photography. Each one keeps a dark end so the label on top stays legible. */
 export const COVERS = {
-  iron:  { label: "Iron",  grad: "linear-gradient(135deg,#232a2e,#100e0b)" },
-  anvil: { label: "Anvil", grad: "linear-gradient(135deg,#2b2521,#100e0b)" },
-  forge: { label: "Forge", grad: "linear-gradient(135deg,#33241c,#100e0b)" },
+  iron:  { label: "Iron",  grad: "linear-gradient(135deg,#2E3439 0%,#161A1D 100%)" },
+  anvil: { label: "Anvil", grad: "linear-gradient(135deg,#35302B 0%,#1B1815 100%)" },
+  forge: { label: "Forge", grad: "linear-gradient(135deg,#4A3220 0%,#241811 100%)" },
 };
 
 export const STATUS_META = {

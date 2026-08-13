@@ -123,7 +123,7 @@ function GroupRow({ group, onClick }) {
 
 function StatusPill({ status }) {
   const cfg = {
-    memorized: { label: "Memorized", bg: "rgba(91,138,91,.18)", color: "#8fc48f", border: "rgba(91,138,91,.4)" },
+    memorized: { label: "Memorized", bg: "rgba(63,125,87,.14)", color: "#3F7D57", border: "rgba(91,138,91,.4)" },
     learning: { label: "Learning", bg: "rgba(200,134,46,.15)", color: T.bronzeLt, border: T.line },
     not_started: { label: "Not Started", bg: "rgba(255,255,255,.04)", color: T.muted2, border: T.lineSoft },
   }[status] || { label: status, bg: "transparent", color: T.muted2, border: T.lineSoft };
@@ -163,7 +163,7 @@ function VerseRow({ verse, selected, onToggle }) {
           background: selected ? T.gold : "transparent",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          {selected && <Check size={13} color="#1a1206" strokeWidth={3} />}
+          {selected && <Check size={13} color="#FCFAF6" strokeWidth={3} />}
         </div>
       </div>
     </Card>
@@ -574,7 +574,7 @@ function BadgeMedal({ label, earned }) {
   return (
     <div style={{
       aspectRatio: "1", borderRadius: "50%",
-      background: "radial-gradient(circle at 35% 30%, #2a2f36, #14161a 75%)",
+      background: "radial-gradient(circle at 35% 30%, #FDFCFA, #EEEBE4 75%)",
       border: `2px solid ${earned ? T.bronze : T.line}`,
       display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: T.display, fontSize: 13, color: earned ? T.bronzeLt : T.muted2,
@@ -1191,8 +1191,8 @@ function ProposeContentScreen({ user, onBack }) {
                 <span style={{
                   fontFamily: T.reg, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em",
                   padding: "3px 9px", borderRadius: 100, fontWeight: 700,
-                  background: p.status === "approved" ? "rgba(91,138,91,.18)" : p.status === "rejected" ? "rgba(212,80,43,.15)" : "rgba(200,134,46,.15)",
-                  color: p.status === "approved" ? "#8fc48f" : p.status === "rejected" ? T.emberLt : T.bronzeLt,
+                  background: p.status === "approved" ? "rgba(63,125,87,.14)" : p.status === "rejected" ? "rgba(212,80,43,.15)" : "rgba(200,134,46,.15)",
+                  color: p.status === "approved" ? "#3F7D57" : p.status === "rejected" ? T.emberLt : T.bronzeLt,
                 }}>{p.status}</span>
               </div>
             </Card>
