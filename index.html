@@ -169,7 +169,7 @@ header{
 }
 .portrait span{font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:#9A948A;line-height:1.9}
 .portrait--photo{padding:0;overflow:hidden;background:var(--limestone);margin:0}
-.portrait--photo img{width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block}
+.portrait--photo img{width:100%;height:100%;object-fit:cover;object-position:50% 50%;display:block}
 .pull{
   font-family:var(--body);font-style:italic;font-weight:500;font-size:1.2rem;line-height:1.55;
   color:var(--ink);border-left:2px solid var(--bronze);padding-left:1.4rem;margin:1.8rem 0 0;
@@ -424,9 +424,11 @@ footer a:hover{color:var(--bronze-lt)}
           built to be."</p>
         </div>
         <figure class="portrait portrait--photo">
-          <img src="/assets/larry-candid.jpg" width="447" height="447"
-               loading="lazy" decoding="async"
-               alt="Larry Beacham, founder of the Kingdom of Disciplined Men.">
+          <img src="/assets/larry-portrait.jpg"
+               srcset="/assets/larry-portrait-sm.jpg 560w, /assets/larry-portrait.jpg 900w"
+               sizes="(max-width:900px) 100vw, 560px"
+               width="900" height="1125" loading="lazy" decoding="async"
+               alt="Larry Beacham, founder of the Kingdom of Disciplined Men, wearing a Kingdom of Disciplined Men shirt.">
         </figure>
       </div>
 
