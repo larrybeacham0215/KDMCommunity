@@ -392,7 +392,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
           .select("status", { count: "exact", head: false })
           .eq("user_id", user.id),
         supabase.rpc("get_today"),
-        supabase.rpc("get_partner_week"),
+        supabase.rpc("get_foxhole"),
       ]);
       if (!alive) return;
       if (v.data) setVerse(v.data);
@@ -512,73 +512,74 @@ function Dashboard({ user, go, streak, progress, staff }) {
         </Card>
       )}
 
-      {/* ---- YOUR BROTHER — the whole point of accountability is that
-             somebody sees. Assigned by Larry, mutual in both directions. ---- */}
-      {partner?.name && (
+      {/* ---- THE FOXHOLE — both weeks, side by side. Not one man watching
+             another; two men looking at the same seven days. ---- */}
+      {partner?.partner_name && (
         <Card pad={0} style={{ marginBottom: 14, overflow: "hidden" }}>
           <div style={{ padding: "17px 20px 16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between",
-              alignItems: "baseline", gap: 10, marginBottom: 11, flexWrap: "wrap" }}>
+              alignItems: "baseline", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
               <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".24em",
-                textTransform: "uppercase", color: T.bronze }}>Your brother</span>
+                textTransform: "uppercase", color: T.bronze }}>The foxhole</span>
               <span style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted2 }}>
-                {partner.reps_7d} of 7 this week
+                you &amp; {String(partner.partner_name).split(" ")[0]}
               </span>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 12 }}>
-              <div style={{
-                width: 38, height: 38, borderRadius: "50%", flex: "0 0 auto",
-                border: `1px solid ${T.line}`, background: T.surface2,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: T.display, fontSize: 15, color: T.bronze,
-              }}>{(partner.name[0] || "?").toUpperCase()}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: T.serif, fontSize: 16.5, color: T.cream }}>{partner.name}</div>
-                <div style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted }}>
-                  {partner.days_quiet === null
-                    ? "Hasn't started yet — reach out."
-                    : partner.days_quiet === 0 ? "Trained today."
-                    : partner.days_quiet <= 2 ? `Last trained ${partner.days_quiet}d ago.`
-                    : `Quiet ${partner.days_quiet} days. Check on him.`}
+            {[
+              { who: "You", week: partner.my_week, count: partner.my_count, mine: true },
+              { who: String(partner.partner_name).split(" ")[0], week: partner.his_week, count: partner.his_count, mine: false },
+            ].map((row, ri) => (
+              <div key={ri} style={{ display: "flex", alignItems: "center", gap: 12,
+                marginBottom: ri === 0 ? 10 : 0 }}>
+                <div style={{ width: 62, flex: "0 0 auto" }}>
+                  <div style={{ fontFamily: T.body, fontSize: 13.5,
+                    color: row.mine ? T.muted : T.cream }}>{row.who}</div>
+                  <div style={{ fontFamily: T.reg, fontSize: 10.5, color: T.muted2 }}>
+                    {row.count}/7
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 5, flex: 1 }}>
+                  {(row.week || []).map((d, i) => (
+                    <div key={i} style={{ flex: 1, textAlign: "center" }}>
+                      <div style={{
+                        height: 24, borderRadius: 3, marginBottom: ri === 1 ? 4 : 0,
+                        background: d.done ? T.gold : "transparent",
+                        border: `1px solid ${d.done ? T.gold : (d.is_today ? T.bronze : T.lineSoft)}`,
+                      }} />
+                      {ri === 1 && (
+                        <div style={{ fontFamily: T.reg, fontSize: 9,
+                          color: d.is_today ? T.bronzeLt : T.muted2 }}>{d.label}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            ))}
 
-            {partner.week?.length > 0 && (
-              <div style={{ display: "flex", gap: 5 }}>
-                {partner.week.map((d, i) => (
-                  <div key={i} style={{ flex: 1, textAlign: "center" }}>
-                    <div style={{
-                      height: 22, borderRadius: 3, marginBottom: 4,
-                      background: d.done ? T.gold : "transparent",
-                      border: `1px solid ${d.done ? T.gold : (d.is_today ? T.bronze : T.lineSoft)}`,
-                    }} />
-                    <div style={{ fontFamily: T.reg, fontSize: 9,
-                      color: d.is_today ? T.bronzeLt : T.muted2 }}>{d.label}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${T.lineSoft}` }}>
+            <div style={{ marginTop: 15, paddingTop: 13, borderTop: `1px solid ${T.lineSoft}` }}>
               <button onClick={logCheckin} disabled={checkinBusy} style={{
                 display: "inline-flex", alignItems: "center", gap: 8, minHeight: 46,
                 padding: "12px 22px", borderRadius: 3, cursor: "pointer",
                 fontFamily: T.reg, fontSize: 12, fontWeight: 700, letterSpacing: ".1em",
                 textTransform: "uppercase",
-                background: today?.checkin_done ? "transparent" : T.gold,
-                color: today?.checkin_done ? "#2F6B49" : "#FCFAF6",
-                border: today?.checkin_done ? "1px solid rgba(47,107,73,.45)" : "none",
+                background: partner.i_checked_in_today ? "transparent" : T.gold,
+                color: partner.i_checked_in_today ? "#2F6B49" : "#FCFAF6",
+                border: partner.i_checked_in_today ? "1px solid rgba(47,107,73,.45)" : "none",
               }}>
-                {today?.checkin_done
+                {partner.i_checked_in_today
                   ? <><CheckCircle2 size={16} /> Polo sent today</>
                   : <><Video size={15} /> I sent my Polo</>}
               </button>
-              <p style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted2, margin: "10px 0 0" }}>
-                {today?.checkin_done
-                  ? "He can see it. Tap again if you marked it by mistake."
-                  : "Send him a video, then mark it. He sees whether you did."}
+
+              <p style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted, margin: "11px 0 0", lineHeight: 1.55 }}>
+                {partner.his_silent_days === null
+                  ? `${String(partner.partner_name).split(" ")[0]} hasn't checked in yet. Be the one who goes first.`
+                  : partner.his_silent_days === 0
+                    ? `${String(partner.partner_name).split(" ")[0]} checked in today.`
+                    : partner.his_silent_days >= 3
+                      ? `${String(partner.partner_name).split(" ")[0]} has been silent ${partner.his_silent_days} days. Go get him.`
+                      : `${String(partner.partner_name).split(" ")[0]} last checked in ${partner.his_silent_days}d ago.`}
               </p>
             </div>
           </div>
