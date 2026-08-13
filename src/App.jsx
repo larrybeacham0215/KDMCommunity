@@ -347,11 +347,23 @@ function Dashboard({ user, go, streak, progress, staff }) {
   const [today, setToday] = useState(null);
   const [partner, setPartner] = useState(null);
   const [repBusy, setRepBusy] = useState(false);
+  const [checkinBusy, setCheckinBusy] = useState(false);
 
   const startWeekVerse = async () => {
     const { error } = await supabase.rpc("start_week_verse");
     if (!error) { const { data } = await supabase.rpc("get_today"); if (data) setToday(data); }
     go("scripturegym");
+  };
+
+  const logCheckin = async () => {
+    if (checkinBusy) return;
+    setCheckinBusy(true);
+    const wasDone = today?.checkin_done;
+    setToday(t => ({ ...t, checkin_done: !wasDone }));
+    const { error } = await supabase.rpc(wasDone ? "undo_foxhole_checkin" : "log_foxhole_checkin");
+    if (error) { const { data } = await supabase.rpc("get_today"); if (data) setToday(data); }
+    else { const { data } = await supabase.rpc("get_partner_week"); if (data) setPartner(data); }
+    setCheckinBusy(false);
   };
 
   const markRepDone = async () => {
@@ -549,12 +561,26 @@ function Dashboard({ user, go, streak, progress, staff }) {
               </div>
             )}
 
-            {(partner.days_quiet === null || partner.days_quiet >= 3) && (
-              <p style={{ fontFamily: T.body, fontSize: 13, color: T.muted,
-                margin: "13px 0 0", paddingTop: 12, borderTop: `1px solid ${T.lineSoft}` }}>
-                Anything a man only does alone, he eventually stops doing. Send him a message.
+            <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${T.lineSoft}` }}>
+              <button onClick={logCheckin} disabled={checkinBusy} style={{
+                display: "inline-flex", alignItems: "center", gap: 8, minHeight: 46,
+                padding: "12px 22px", borderRadius: 3, cursor: "pointer",
+                fontFamily: T.reg, fontSize: 12, fontWeight: 700, letterSpacing: ".1em",
+                textTransform: "uppercase",
+                background: today?.checkin_done ? "transparent" : T.gold,
+                color: today?.checkin_done ? "#2F6B49" : "#FCFAF6",
+                border: today?.checkin_done ? "1px solid rgba(47,107,73,.45)" : "none",
+              }}>
+                {today?.checkin_done
+                  ? <><CheckCircle2 size={16} /> Polo sent today</>
+                  : <><Video size={15} /> I sent my Polo</>}
+              </button>
+              <p style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted2, margin: "10px 0 0" }}>
+                {today?.checkin_done
+                  ? "He can see it. Tap again if you marked it by mistake."
+                  : "Send him a video, then mark it. He sees whether you did."}
               </p>
-            )}
+            </div>
           </div>
         </Card>
       )}
