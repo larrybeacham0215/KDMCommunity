@@ -362,7 +362,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
     setToday(t => ({ ...t, checkin_done: !wasDone }));
     const { error } = await supabase.rpc(wasDone ? "undo_foxhole_checkin" : "log_foxhole_checkin");
     if (error) { const { data } = await supabase.rpc("get_today"); if (data) setToday(data); }
-    else { const { data } = await supabase.rpc("get_partner_week"); if (data) setPartner(data); }
+    else { const { data } = await supabase.rpc("get_foxhole"); if (data) setPartner(data); }
     setCheckinBusy(false);
   };
 
