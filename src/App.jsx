@@ -408,7 +408,9 @@ function Dashboard({ user, go, streak, progress, staff }) {
   const when = (iso, mins) => {
     if (!iso) return "Time to be set";
     const d = new Date(iso);
-    return `${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · ${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}${mins ? ` · ${mins} min` : ""}`;
+    // Eastern, always — see the note on fmtWhen in gymSessionsData.js
+    const TZ = "America/New_York";
+    return `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TZ })} · ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ })} ET${mins ? ` · ${mins} min` : ""}`;
   };
   const countdown = (iso) => {
     if (!iso) return null;

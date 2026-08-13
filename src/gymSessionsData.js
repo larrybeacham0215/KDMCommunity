@@ -211,12 +211,18 @@ export function isApprover(profile) {
   return !!profile && (profile.role === "owner" || profile.role === "admin");
 }
 
+/* The gym meets Monday nights at 7:00 PM Eastern, full stop. Times are shown in
+   Eastern and labelled ET rather than in each man's local zone — a man in
+   Phoenix seeing "4:00 PM" next to marketing that says 7:00 PM ET is how people
+   miss the room. The emails already format this way; the app now matches. */
+export const GYM_TZ = "America/New_York";
+
 export function fmtWhen(iso, mins) {
   if (!iso) return "Date to be set";
   const d = new Date(iso);
-  const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${time}${mins ? ` · ${mins} min` : ""}`;
+  const day = d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", timeZone: GYM_TZ });
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: GYM_TZ });
+  return `${day} · ${time} ET${mins ? ` · ${mins} min` : ""}`;
 }
 
 export function isPast(iso) {
