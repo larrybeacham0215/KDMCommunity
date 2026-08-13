@@ -50,9 +50,10 @@ export function Roster() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const pair = async (userId, partnerId) => {
+  // A foxhole is mutual: digging one pulls both men out of any other.
+  const dig = async (aId, bId) => {
     setBusy(true);
-    await supabase.rpc("set_partner", { p_user: userId, p_partner: partnerId || null });
+    await supabase.rpc("set_foxhole", { p_a: aId, p_b: bId || null });
     await load(); setBusy(false);
   };
 
@@ -94,11 +95,11 @@ export function Roster() {
         </div>
         <div>
           <select
-            value={rows.find(x => x.full_name === r.partner_name)?.id || ""}
-            onChange={e => pair(r.id, e.target.value)}
+            value={r.partner_id || ""}
+            onChange={e => dig(r.id, e.target.value)}
             disabled={busy}
             style={{ ...inputBase, padding: "7px 9px", fontSize: 12.5, appearance: "none" }}>
-            <option value="">No partner</option>
+            <option value="">No foxhole</option>
             {rows.filter(x => x.id !== r.id).map(x => (
               <option key={x.id} value={x.id}>{x.full_name}</option>
             ))}
@@ -124,7 +125,7 @@ export function Roster() {
           <div>Man</div><div>Last active</div>
           <div style={{ textAlign: "center" }}>Reps</div>
           <div style={{ textAlign: "center" }}>Mem</div>
-          <div>Partner</div>
+          <div>Foxhole</div>
         </div>
         {items.map(r => <Row key={r.id} r={r} />)}
       </Card>
@@ -166,8 +167,9 @@ export function Roster() {
         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
           <Link2 size={16} color={T.bronze} style={{ flex: "0 0 auto", marginTop: 2 }} />
           <div style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted, lineHeight: 1.6 }}>
-            Pairing two men links them both ways — each sees the other's week on his Forge.
-            Accountability that only runs one direction is surveillance.
+            A foxhole is two men dug in together. Pairing them links both ways &mdash; each sees the
+            other's week on his Forge. A man can only be in one foxhole at a time, and pulling him
+            into a new one pulls him out of the old.
           </div>
         </div>
       </Card>
