@@ -137,6 +137,20 @@ header{
 .road li{font-size:.93rem;color:var(--steel);padding:.72rem 0;border-bottom:1px solid var(--rule)}
 .road .btn{margin-top:auto;align-self:flex-start}
 
+
+/* ---------- the brotherhood ---------- */
+.proof{padding:0}
+.proof figure{margin:0}
+.proof img{
+  width:100%;height:auto;display:block;border-radius:2px;
+  border:1px solid var(--rule);background:var(--limestone);
+}
+.proof .cap{
+  display:flex;justify-content:space-between;gap:1.4rem;flex-wrap:wrap;
+  margin-top:1.1rem;font-size:.86rem;color:var(--steel);
+}
+.proof .cap b{color:var(--ink);font-weight:600}
+
 /* ---------- verse band ---------- */
 .verse{max-width:820px;margin:0 auto;text-align:center}
 .verse blockquote{
@@ -154,6 +168,8 @@ header{
   display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem;
 }
 .portrait span{font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:#9A948A;line-height:1.9}
+.portrait--photo{padding:0;overflow:hidden;background:var(--limestone);margin:0}
+.portrait--photo img{width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block}
 .pull{
   font-family:var(--body);font-style:italic;font-weight:500;font-size:1.2rem;line-height:1.55;
   color:var(--ink);border-left:2px solid var(--bronze);padding-left:1.4rem;margin:1.8rem 0 0;
@@ -317,6 +333,26 @@ footer a:hover{color:var(--bronze-lt)}
     </div>
   </section>
 
+  <!-- ================= THE BROTHERHOOD ================= -->
+  <section class="band proof" style="padding-top:var(--band);padding-bottom:var(--band)">
+    <div class="shell">
+      <div class="eyebrow">The brotherhood</div>
+      <h2 style="margin-bottom:1.6rem">No king reigns alone.</h2>
+      <figure>
+        <img
+          src="/assets/brotherhood.jpg"
+          srcset="/assets/brotherhood-sm.jpg 640w, /assets/brotherhood.jpg 1024w"
+          sizes="(max-width:760px) 100vw, 1200px"
+          width="1024" height="768" loading="lazy" decoding="async"
+          alt="Larry Beacham kneeling in front of roughly two dozen men from the Kingdom of Disciplined Men, gathered together outdoors at sunset.">
+        <figcaption class="cap">
+          <span>Men of the Kingdom, Tampa, Florida.</span>
+          <span><b>Iron sharpens iron</b> &mdash; and the men beside you will not let you drift back.</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
   <!-- ================= THE ROADS ================= -->
   <section class="band band--stone" id="roads">
     <div class="shell">
@@ -387,7 +423,11 @@ footer a:hover{color:var(--bronze-lt)}
           <p class="pull">"I don't build better men. I help men become who they were already
           built to be."</p>
         </div>
-        <div class="portrait"><span>Portrait of Larry<br>to be added</span></div>
+        <figure class="portrait portrait--photo">
+          <img src="/assets/larry-candid.jpg" width="447" height="447"
+               loading="lazy" decoding="async"
+               alt="Larry Beacham, founder of the Kingdom of Disciplined Men.">
+        </figure>
       </div>
 
     </div>
