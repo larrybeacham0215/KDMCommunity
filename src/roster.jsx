@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ClipboardList, RefreshCw, Link2, AlertTriangle } from "lucide-react";
+import { ClipboardList, RefreshCw, Link2, AlertTriangle, Users } from "lucide-react";
 import { T, Eyebrow, Card, Btn, inputBase } from "./ui";
 import { supabase } from "./dataService";
 
@@ -41,12 +41,17 @@ export function Roster() {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [health, setHealth] = useState(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.rpc("gym_roster");
+    const [{ data, error }, h] = await Promise.all([
+      supabase.rpc("gym_roster"),
+      supabase.rpc("foxhole_health"),
+    ]);
     if (error) { setErr(error.message); return; }
     if (data && data.error) { setErr(data.error); return; }
     setErr(null); setRows(data || []);
+    if (h?.data && !h.data.error) setHealth(h.data);
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -109,6 +114,73 @@ export function Roster() {
     );
   };
 
+
+  const FOX_STATE = {
+    alive:         { label: "Holding",      tone: "ok",   note: "both men checked in" },
+    one_sided:     { label: "One-sided",    tone: "warn", note: "one man carrying it" },
+    silent:        { label: "Gone silent",  tone: "stop", note: "neither man showing up" },
+    never_started: { label: "Never dug in", tone: "stop", note: "no check-ins at all" },
+  };
+
+  const Foxholes = () => {
+    if (!health) return null;
+    const fx = health.foxholes || [];
+    const un = health.unpaired || [];
+    return (
+      <div style={{ marginBottom: 34 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
+          <span style={{ fontFamily: T.reg, fontSize: 11, letterSpacing: ".2em",
+            textTransform: "uppercase", color: T.bronze }}>Foxholes</span>
+          <span style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted2 }}>
+            two men going quiet together is louder than one
+          </span>
+        </div>
+
+        <Card pad={18}>
+          {fx.length === 0 ? (
+            <div style={{ fontFamily: T.body, fontSize: 14, color: T.muted }}>
+              No foxholes dug yet. Pair men below and each will see the other's week.
+            </div>
+          ) : fx.map(f => {
+            const st = FOX_STATE[f.state] || FOX_STATE.silent;
+            const c = TONE[st.tone];
+            return (
+              <div key={f.id} style={{ display: "grid",
+                gridTemplateColumns: "1.6fr 118px 1fr", gap: 12, alignItems: "center",
+                padding: "13px 0", borderBottom: `1px solid ${T.lineSoft}` }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream }}>
+                    {f.name_a} <span style={{ color: T.muted2 }}>&amp;</span> {f.name_b}
+                  </div>
+                  <div style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2 }}>
+                    {f.count_a}/7 &middot; {f.count_b}/7
+                    {f.has_link ? "" : " · no Marco Polo link saved"}
+                  </div>
+                </div>
+                <div><Pill tone={st.tone}>{st.label}</Pill></div>
+                <div style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted }}>
+                  {f.carrying ? `${f.carrying} is carrying it` : st.note}
+                </div>
+              </div>
+            );
+          })}
+
+          {un.length > 0 && (
+            <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${T.line}` }}>
+              <div style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                <Users size={15} color={T.muted2} style={{ flex: "0 0 auto", marginTop: 3 }} />
+                <div style={{ fontFamily: T.body, fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
+                  <b style={{ color: T.cream }}>{un.length} not in a foxhole:</b>{" "}
+                  {un.map(u => u.name).join(", ")}
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  };
+
   const Group = ({ title, note, items }) => items.length === 0 ? null : (
     <div style={{ marginBottom: 30 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
@@ -158,6 +230,8 @@ export function Roster() {
           </Card>
         ))}
       </div>
+
+      <Foxholes />
 
       <Group title="Ask about these men" note="quiet a week or more, or never started" items={quiet} />
       <Group title="Slipping" note="3 to 6 days" items={slipping} />
