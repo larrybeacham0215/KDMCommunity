@@ -70,10 +70,25 @@ const SELECT = `
   id, title, description, focus_verses, discussion_questions, notes, cover_key,
   created_by, host_id, host_name, manager_id, status, scheduled_at,
   duration_minutes, join_url, share_slug, approved_by, approved_at,
-  rejected_reason, created_at,
-  host:profiles!gym_meetings_host_id_fkey ( id, full_name, email ),
-  creator:profiles!gym_meetings_created_by_fkey ( id, full_name, email )
+  rejected_reason, created_at
 `;
+
+/* Host names come from member_directory, NOT from profiles.
+   profiles is locked by RLS to your own row, so embedding it here returns null
+   for everyone except the owner — which is why every card read "Host to be
+   named" for members while looking correct to Larry. member_directory exposes
+   {id, display_name} to any signed-in member for exactly this purpose. */
+async function attachNames(rows) {
+  const ids = [...new Set(rows.flatMap(r => [r.host_id, r.created_by]).filter(Boolean))];
+  if (!ids.length) return rows;
+  const { data } = await supabase.from("member_directory").select("id, display_name").in("id", ids);
+  const byId = new Map((data || []).map(m => [m.id, m.display_name]));
+  return rows.map(r => ({
+    ...r,
+    host:    r.host_id    ? { id: r.host_id,    full_name: byId.get(r.host_id)    || null } : null,
+    creator: r.created_by ? { id: r.created_by, full_name: byId.get(r.created_by) || null } : null,
+  }));
+}
 
 /** Every session the signed-in user is allowed to see (RLS decides). */
 export async function fetchMeetings() {
@@ -81,13 +96,13 @@ export async function fetchMeetings() {
     .from("gym_meetings")
     .select(SELECT)
     .order("scheduled_at", { ascending: true, nullsFirst: false });
-  return { data: data || [], error };
+  return { data: await attachNames(data || []), error };
 }
 
 export async function fetchMeeting(id) {
   const { data, error } = await supabase
     .from("gym_meetings").select(SELECT).eq("id", id).single();
-  return { data, error };
+  return { data: data ? (await attachNames([data]))[0] : data, error };
 }
 
 export async function fetchRegistrations(meetingId) {
@@ -124,13 +139,13 @@ export async function createMeeting(userId, form, status = "pending") {
   };
   const { data, error } = await supabase
     .from("gym_meetings").insert(row).select(SELECT).single();
-  return { data, error };
+  return { data: data ? (await attachNames([data]))[0] : data, error };
 }
 
 export async function updateMeeting(id, patch) {
   const { data, error } = await supabase
     .from("gym_meetings").update(patch).eq("id", id).select(SELECT).single();
-  return { data, error };
+  return { data: data ? (await attachNames([data]))[0] : data, error };
 }
 
 export const submitMeeting  = id => updateMeeting(id, { status: "pending" });

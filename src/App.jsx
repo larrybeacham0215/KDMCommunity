@@ -371,7 +371,7 @@ function Dashboard({ user, go, streak, progress, staff }) {
       const [v, s, prog, td] = await Promise.all([
         supabase.rpc("verse_of_the_day"),
         supabase.from("gym_meetings")
-          .select("id, title, scheduled_at, duration_minutes, cover_key, status, host_name, host:profiles!gym_meetings_host_id_fkey(full_name)")
+          .select("id, title, scheduled_at, duration_minutes, cover_key, status, host_name, host_id")
           .eq("status", "approved")
           .order("scheduled_at", { ascending: true })
           .limit(3),
@@ -383,6 +383,17 @@ function Dashboard({ user, go, streak, progress, staff }) {
       if (!alive) return;
       if (v.data) setVerse(v.data);
       if (td?.data) setToday(td.data);
+      // profiles is RLS-locked to your own row, so host names must come from
+      // member_directory or every card reads "Host to be named" for members.
+      if (s.data?.length) {
+        const ids = [...new Set(s.data.map(m => m.host_id).filter(Boolean))];
+        if (ids.length) {
+          const { data: dir } = await supabase
+            .from("member_directory").select("id, display_name").in("id", ids);
+          const byId = new Map((dir || []).map(d => [d.id, d.display_name]));
+          s.data.forEach(m => { m.host = m.host_id ? { full_name: byId.get(m.host_id) || null } : null; });
+        }
+      }
       const rows = prog?.data || [];
       setFirstSteps({
         picked: rows.length > 0,
