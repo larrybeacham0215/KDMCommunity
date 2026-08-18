@@ -454,18 +454,37 @@ async function handleRegister(req: Request): Promise<Response> {
 }
 
 async function handleAuthorize(req: Request, url: URL): Promise<Response> {
-  const p = url.searchParams;
-  const clientId = p.get("client_id") ?? "";
-  const redirectUri = p.get("redirect_uri") ?? "";
-  const state = p.get("state") ?? "";
-  const challenge = p.get("code_challenge") ?? "";
-  if (!clientId || !redirectUri) return htmlPage("<h1>Invalid request</h1><p>Missing client_id or redirect_uri.</p>", 400);
+  // GET carries the parameters in the query string; POST carries them in the
+  // form body. Read whichever applies before validating.
+  let clientId: string, redirectUri: string, state: string, challenge: string;
+  let email = "", password = "";
 
+  if (req.method === "POST") {
+    const fd = await req.formData();
+    clientId = String(fd.get("client_id") ?? "");
+    redirectUri = String(fd.get("redirect_uri") ?? "");
+    state = String(fd.get("state") ?? "");
+    challenge = String(fd.get("code_challenge") ?? "");
+    email = String(fd.get("email") ?? "");
+    password = String(fd.get("password") ?? "");
+  } else {
+    const p = url.searchParams;
+    clientId = p.get("client_id") ?? "";
+    redirectUri = p.get("redirect_uri") ?? "";
+    state = p.get("state") ?? "";
+    challenge = p.get("code_challenge") ?? "";
+  }
+
+  if (!clientId || !redirectUri) {
+    return htmlPage("<h1>Invalid request</h1><p>Missing client_id or redirect_uri.</p>", 400);
+  }
+
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   const hidden =
-    '<input type="hidden" name="client_id" value="' + clientId + '">' +
-    '<input type="hidden" name="redirect_uri" value="' + redirectUri + '">' +
-    '<input type="hidden" name="state" value="' + state + '">' +
-    '<input type="hidden" name="code_challenge" value="' + challenge + '">';
+    '<input type="hidden" name="client_id" value="' + esc(clientId) + '">' +
+    '<input type="hidden" name="redirect_uri" value="' + esc(redirectUri) + '">' +
+    '<input type="hidden" name="state" value="' + esc(state) + '">' +
+    '<input type="hidden" name="code_challenge" value="' + esc(challenge) + '">';
 
   const form = (err?: string) => htmlPage(
     "<h1>Connect Claude to the Kingdom</h1>" +
@@ -480,29 +499,26 @@ async function handleAuthorize(req: Request, url: URL): Promise<Response> {
 
   if (req.method === "GET") return form();
 
-  const fd = await req.formData();
-  const email = String(fd.get("email") ?? "");
-  const password = String(fd.get("password") ?? "");
   const owner = await verifyOwner(email, password);
   if (!owner) return form("Sign-in failed, or that account is not a Super Admin.");
 
   const code = rand(32);
   await q(
     "INSERT INTO public.mcp_oauth_codes (code, client_id, redirect_uri, code_challenge, user_id, user_email, expires_at) VALUES (" +
-      lit(code) + ", " + lit(String(fd.get("client_id"))) + ", " + lit(String(fd.get("redirect_uri"))) + ", " +
-      lit(String(fd.get("code_challenge"))) + ", " + lit(owner.id) + ", " + lit(email) +
+      lit(code) + ", " + lit(clientId) + ", " + lit(redirectUri) + ", " +
+      lit(challenge) + ", " + lit(owner.id) + ", " + lit(email) +
       ", now() + interval '10 minutes')", false,
   );
-  await auditLog("MCP connector authorized via OAuth", "Super Admin " + email + " authorized a Claude client.");
+  await auditLog("MCP connector authorized via OAuth",
+    "Super Admin " + email + " authorized a Claude client (" + clientId + ").");
 
-  const dest = new URL(String(fd.get("redirect_uri")));
+  const dest = new URL(redirectUri);
   dest.searchParams.set("code", code);
-  const st = String(fd.get("state") ?? "");
-  if (st) dest.searchParams.set("state", st);
+  if (state) dest.searchParams.set("state", state);
   return htmlPage(
     '<h1>Authorized</h1><p class="ok">Returning you to Claude…</p>' +
     '<script>location.href=' + JSON.stringify(dest.toString()) + ";</script>" +
-    '<p><a style="color:#b8863b" href="' + dest.toString() + '">Continue</a></p>',
+    '<p><a style="color:#b8863b" href="' + esc(dest.toString()) + '">Continue</a></p>',
   );
 }
 
