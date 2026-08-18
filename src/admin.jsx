@@ -3,7 +3,7 @@ import {
   Users, Brain, NotebookPen, Bot, Cpu, ScrollText, Plug, Workflow, Webhook,
   KeyRound, Activity, LayoutGrid, Plus, Trash2, Save, RefreshCw, Power,
   Send, Shield, Sparkles, ChevronRight, ChevronLeft, X, AlertTriangle, Circle, CheckCircle2,
-  Dumbbell, Pencil, ClipboardList,
+  Dumbbell, Pencil, ClipboardList, Radio,
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Eyebrow, Btn, Card, inputBase, Field } from "./ui";
@@ -30,6 +30,7 @@ export const SYSTEMS_SUB = [
   { id: "sys_automations", label: "Automations", icon: Workflow },
   { id: "sys_webhooks", label: "Webhooks", icon: Webhook },
   { id: "sys_secrets", label: "Secrets & Keys", icon: KeyRound },
+  { id: "sys_connectors", label: "Connectors", icon: Radio },
   { id: "sys_log", label: "Update Log", icon: Activity },
 ];
 
@@ -41,6 +42,7 @@ export const ADMIN_TITLES = {
   systems: "Systems", sys_overview: "Systems · Overview", sys_integrations: "Systems · Integrations",
   sys_automations: "Systems · Automations", sys_webhooks: "Systems · Webhooks",
   sys_secrets: "Systems · Secrets & Keys", sys_log: "Systems · Update Log",
+  sys_connectors: "Systems · Connectors",
 };
 
 /* ---------------------------------------------------------------------------
@@ -872,7 +874,7 @@ function SystemsOverview({ go }) {
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))" }}>
         {tiles.map(t => {
           const Icon = t.icon;
-          const real = t.id === "sys_log";
+          const real = t.id === "sys_log" || t.id === "sys_connectors";
           return (
             <Card key={t.id} pad={18} style={{ cursor: "pointer" }}>
               <div onClick={() => go(t.id)}>
@@ -919,9 +921,155 @@ function UpdateLog() {
   );
 }
 
+
+/* ---------------------------------------------------------------------------
+   CONNECTORS — the KDM MCP server that lets Claude reach this platform.
+   The endpoint secret is deliberately NOT in this bundle; the app only ever
+   reads and flips the kill switch.
+   ------------------------------------------------------------------------- */
+const MCP_TOOLS = [
+  ["kdm_status", "Live site + portal health, deployed bundle hash, tier counts, recent changes"],
+  ["kdm_schema", "Every table, column and RLS policy in the database"],
+  ["kdm_query", "Read-only SQL. Writes are refused outright"],
+  ["kdm_execute", "Write SQL. Needs confirmation; destructive statements need a second one"],
+  ["kdm_members", "The roster by tier, with streaks and join dates"],
+  ["kdm_set_role", "Change a man's tier. Promotion to Super Admin needs confirmation"],
+  ["kdm_log", "Read and append to this Update Log"],
+];
+
+function Connectors() {
+  const [flag, setFlag] = useState(null);
+  const [recent, setRecent] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr("");
+    try {
+      const { data, error } = await supabase
+        .from("mcp_flags").select("*").eq("key", "connector").maybeSingle();
+      if (error) throw error;
+      setFlag(data);
+      const { data: log } = await supabase
+        .from("update_log").select("summary,created_at")
+        .eq("actor", "claude-mcp").order("created_at", { ascending: false }).limit(5);
+      setRecent(log || []);
+    } catch (e) { setErr(e.message || String(e)); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = async () => {
+    if (!flag) return;
+    const next = !flag.enabled;
+    if (!next && !window.confirm("Disable the connector? Claude loses all access to this platform until you switch it back on.")) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("mcp_flags")
+        .update({ enabled: next, updated_at: new Date().toISOString() }).eq("key", "connector");
+      if (error) throw error;
+      await logUpdate("owner", `MCP connector ${next ? "ENABLED" : "DISABLED"}`,
+        `The KDM MCP connector was switched ${next ? "on" : "off"} from Command · Systems · Connectors.`);
+      await load();
+    } catch (e) { setErr(e.message || String(e)); }
+    setBusy(false);
+  };
+
+  const on = !!flag?.enabled;
+
+  return (
+    <Wrap>
+      <Head kicker="Systems" title="Connectors"
+        sub="The MCP server that lets Claude read and change this platform directly."
+        right={<Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>} />
+      {err && <ErrBox msg={err} />}
+      {loading ? <Loading /> : (
+        <>
+          <Card pad={20} style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "radial-gradient(circle,rgba(156,106,36,.16),transparent 70%)" : "transparent" }}>
+                  <Radio size={22} color={on ? T.bronzeLt : T.muted2} />
+                </div>
+                <div>
+                  <div style={{ fontFamily: T.reg, fontSize: 16, color: T.cream }}>KDM MCP Server</div>
+                  <div style={{ fontFamily: T.body, fontSize: 12.5, color: on ? T.bronzeLt : T.muted2, marginTop: 2 }}>
+                    {on ? "Active — Claude can reach the Kingdom" : "Disabled — every tool refuses to run"}
+                  </div>
+                </div>
+              </div>
+              <Btn kind={on ? "ghost" : "solid"} onClick={toggle} disabled={busy}>
+                <Power size={14} /> {busy ? "Working…" : on ? "Disable" : "Enable"}
+              </Btn>
+            </div>
+            <p style={{ fontFamily: T.body, fontSize: 13, color: T.muted, marginTop: 14, lineHeight: 1.55 }}>
+              This is the kill switch. Flipping it off takes effect on the very next request — no
+              redeploy, no waiting. The endpoint address and its secret live server-side only and
+              never ship in this app.
+            </p>
+          </Card>
+
+          <Card pad={18} style={{ marginBottom: 12 }}>
+            <Eyebrow>What Claude can do through it</Eyebrow>
+            <div style={{ display: "grid", gap: 9, marginTop: 10 }}>
+              {MCP_TOOLS.map(([name, what]) => (
+                <div key={name} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <CheckCircle2 size={14} color={T.bronze} style={{ marginTop: 3, flexShrink: 0 }} />
+                  <div>
+                    <span style={{ fontFamily: T.mono || T.body, fontSize: 13, color: T.cream }}>{name}</span>
+                    <span style={{ fontFamily: T.body, fontSize: 13, color: T.muted }}> — {what}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card pad={18} style={{ marginBottom: 12 }}>
+            <Eyebrow>Guardrails</Eyebrow>
+            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              {[
+                "Every write is recorded in the Update Log as claude-mcp",
+                "Deleting or dropping anything takes two separate confirmations",
+                "Promoting a man to Super Admin takes its own confirmation",
+                "These tools see every member's private data — Article IV still binds",
+              ].map((t, i) => (
+                <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                  <Shield size={13} color={T.muted2} style={{ marginTop: 3, flexShrink: 0 }} />
+                  <span style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted }}>{t}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card pad={18}>
+            <Eyebrow>Recent connector activity</Eyebrow>
+            {recent.length === 0 ? (
+              <p style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted2, marginTop: 10 }}>
+                Nothing yet. Anything Claude changes through the connector shows up here.
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                {recent.map((r, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <span style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted }}>{r.summary}</span>
+                    <span style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, whiteSpace: "nowrap" }}>{fmt(r.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+    </Wrap>
+  );
+}
+
 export function SystemsScreen({ view, go }) {
   if (view === "systems" || view === "sys_overview") return <SystemsOverview go={go} />;
   if (view === "sys_log") return <UpdateLog />;
+  if (view === "sys_connectors") return <Connectors />;
   if (view === "sys_integrations") return <PlaceholderModule icon={Plug} title="Integrations" blurb="Connect outside services into the Kingdom." ideas={["Stripe — payments & memberships", "Resend / SendGrid — email & password resets", "Calendar / scheduling", "Zapier / Make webhooks"]} />;
   if (view === "sys_automations") return <PlaceholderModule icon={Workflow} title="Automations" blurb="Rules that run on their own — triggers and scheduled jobs." ideas={["Daily check-in reminders", "Streak-break alerts to the owner", "New-member onboarding sequence", "Weekly summary from Gideon"]} />;
   if (view === "sys_webhooks") return <PlaceholderModule icon={Webhook} title="Webhooks" blurb="Inbound and outbound event hooks." ideas={["Stripe payment events", "Supabase database webhooks", "Custom outbound POST on check-in"]} />;
