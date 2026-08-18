@@ -1,0 +1,6 @@
+{
+  "resource": "https://cibevunbazujwvhqhkro.supabase.co/functions/v1/kdm-mcp/mcp",
+  "authorization_servers": ["https://kdmcommunity.com"],
+  "scopes_supported": ["mcp"],
+  "bearer_methods_supported": ["header"]
+}
