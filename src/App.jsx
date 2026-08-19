@@ -25,7 +25,7 @@ import { PathScreen } from "./path";
    LOGIN
    ========================================================================== */
 function Login() {
-  const [mode, setMode] = useState("login"); // "login" | "signup" | "sent"
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "sent" | "forgot" | "reset_sent"
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -61,6 +61,24 @@ function Login() {
     // Otherwise onAuthStateChange picks up the session and drops them into the app.
   };
 
+  const submitForgot = async () => {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setErr("Enter a valid email.");
+    setErr(""); setLoading(true);
+    // redirectTo is required: site_url is the bare apex, which serves the static
+    // marketing page and has no JS to catch the recovery token. This sends him
+    // into the portal instead, where PASSWORD_RECOVERY is handled.
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: "https://kdmcommunity.com/app/",
+    });
+    setLoading(false);
+    if (error) {
+      return setErr(/rate|frequen|seconds/i.test(error.message || "")
+        ? "You just asked for one. Give it a minute, then try again."
+        : (error.message || "Couldn't send that email. Try again."));
+    }
+    setMode("reset_sent");
+  };
+
   const go = (m) => { setMode(m); setErr(""); setPw(""); setPw2(""); };
 
   const inputStyle = {
@@ -68,12 +86,18 @@ function Login() {
     color: T.cream, padding: "14px 14px 14px 42px", fontFamily: T.body, fontSize: 16, outline: "none",
   };
 
-  const eyebrow = mode === "signup" ? "Answer The Call" : mode === "sent" ? "One Step Left" : "Members Only";
-  const tagline = mode === "signup"
-    ? "Step through the gate for the first time."
-    : mode === "sent"
-      ? "Confirm your email to finish."
-      : "Step back through the gate.";
+  const eyebrow =
+    mode === "signup" ? "Answer The Call"
+    : mode === "sent" ? "One Step Left"
+    : mode === "forgot" ? "Lost The Key"
+    : mode === "reset_sent" ? "Check Your Email"
+    : "Members Only";
+  const tagline =
+    mode === "signup" ? "Step through the gate for the first time."
+    : mode === "sent" ? "Confirm your email to finish."
+    : mode === "forgot" ? "It happens. We'll send you a way back in."
+    : mode === "reset_sent" ? "The way back in is waiting for you."
+    : "Step back through the gate.";
 
   return (
     <div style={{
@@ -91,7 +115,44 @@ function Login() {
           {tagline}
         </p>
 
-        {mode === "sent" ? (
+        {mode === "reset_sent" ? (
+          <Card pad={26}>
+            <Mail size={30} color={T.bronze} style={{ marginBottom: 12 }} />
+            <p style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, lineHeight: 1.6, marginBottom: 8 }}>
+              If <strong style={{ color: T.bronzeLt }}>{email}</strong> belongs to an account,
+              a reset link is on its way.
+            </p>
+            <p style={{ fontFamily: T.body, fontSize: 13, color: T.muted, lineHeight: 1.55, marginBottom: 8 }}>
+              The link is good for one hour. Open it on this device if you can.
+            </p>
+            <p style={{ fontFamily: T.body, fontSize: 12, color: T.muted2, lineHeight: 1.55, marginBottom: 20 }}>
+              Nothing after a few minutes? Check your spam folder and mark it "not spam" so
+              the next one lands properly.
+            </p>
+            <Btn kind="outline" full onClick={() => go("login")}>Back to sign in</Btn>
+          </Card>
+        ) : mode === "forgot" ? (
+          <Card pad={24} style={{ textAlign: "left" }}>
+            <p style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted, lineHeight: 1.6, marginBottom: 18 }}>
+              Enter the email you signed up with and we'll send you a link to set a new password.
+            </p>
+            <label style={lblStyle}>Email</label>
+            <div style={{ position: "relative", marginBottom: 18 }}>
+              <Mail size={16} style={iconInInput} />
+              <input style={inputStyle} type="email" value={email} placeholder="you@email.com"
+                onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && submitForgot()} />
+            </div>
+            {err && <p style={{ color: T.emberHot, fontFamily: T.body, fontSize: 13, marginBottom: 12 }}>{err}</p>}
+            <Btn full onClick={submitForgot} disabled={loading}>
+              {loading ? "Sending…" : <>Send Reset Link <ArrowRight size={15} /></>}
+            </Btn>
+            <p style={{ textAlign: "center", marginTop: 16, color: T.muted2, fontFamily: T.body, fontSize: 12 }}>
+              Remembered it?{" "}
+              <span style={{ color: T.bronzeLt, cursor: "pointer", textDecoration: "underline" }}
+                onClick={() => go("login")}>Sign in</span>
+            </p>
+          </Card>
+        ) : mode === "sent" ? (
           <Card pad={26}>
             <Mail size={30} color={T.bronze} style={{ marginBottom: 12 }} />
             <p style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, lineHeight: 1.6, marginBottom: 8 }}>
@@ -158,6 +219,11 @@ function Login() {
             {err && <p style={{ color: T.emberHot, fontFamily: T.body, fontSize: 13, marginBottom: 12 }}>{err}</p>}
             <Btn full onClick={submit} disabled={loading}>{loading ? "Entering…" : <>Enter <ArrowRight size={15} /></>}</Btn>
 
+            <p style={{ textAlign: "center", marginTop: 14, fontFamily: T.body, fontSize: 12.5 }}>
+              <span style={{ color: T.bronzeLt, cursor: "pointer", textDecoration: "underline" }}
+                onClick={() => go("forgot")}>Forgot your password?</span>
+            </p>
+
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0 16px" }}>
               <span style={{ flex: 1, height: 1, background: T.lineSoft }} />
               <span style={{ fontFamily: T.reg, fontSize: 10.5, letterSpacing: ".2em", color: T.muted2, textTransform: "uppercase" }}>New here</span>
@@ -177,6 +243,101 @@ function Login() {
 }
 const lblStyle = { fontFamily: T.reg, fontSize: 11, letterSpacing: ".18em", textTransform: "uppercase", color: T.muted, display: "block", marginBottom: 7 };
 const iconInInput = { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.bronze };
+
+/* ============================================================================
+   RESET PASSWORD
+   Rendered when a recovery link established the session. The man is technically
+   signed in at this point, so this screen stands in front of the app until he
+   has actually set a new password.
+   ========================================================================== */
+function ResetPassword({ email, onDone }) {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const inputStyle = {
+    width: "100%", background: T.obsidian, border: `1px solid ${T.line}`, borderRadius: 2,
+    color: T.cream, padding: "14px 14px 14px 42px", fontFamily: T.body, fontSize: 16, outline: "none",
+  };
+
+  const submit = async () => {
+    // Matches the 8-char rule the signup screen enforces. Supabase's own
+    // password_min_length is 6 - this is deliberately the stricter of the two so
+    // a reset can never leave an account weaker than signup allows.
+    if (pw.length < 8) return setErr("Password must be at least 8 characters.");
+    if (pw !== pw2) return setErr("Those passwords don't match.");
+    setErr(""); setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setLoading(false);
+    if (error) return setErr(error.message || "Couldn't set that password. Try again.");
+    setDone(true);
+  };
+
+  const bail = async () => { await supabase.auth.signOut(); onDone(); };
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: `radial-gradient(120% 80% at 50% -10%, ${T.obsidian2} 0%, ${T.obsidian} 55%)`,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }}>
+      <div style={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}><Crest size={54} /></div>
+        <div style={{ marginBottom: 6 }}><Eyebrow>{done ? "Back In" : "Set A New Password"}</Eyebrow></div>
+        <h1 style={{
+          fontFamily: T.display, fontSize: 30, color: T.cream, margin: "8px 0 4px",
+          letterSpacing: ".01em", lineHeight: 1.05,
+        }}>KINGDOM OF<br />DISCIPLINED MEN</h1>
+        <p style={{ fontFamily: T.serif, fontStyle: "italic", color: T.bronzeLt, fontSize: 14, marginBottom: 26 }}>
+          {done ? "The gate is yours again." : "Choose it once. Make it stick."}
+        </p>
+
+        {done ? (
+          <Card pad={26}>
+            <CheckCircle2 size={30} color={T.ok} style={{ marginBottom: 12 }} />
+            <p style={{ fontFamily: T.body, fontSize: 14.5, color: T.cream, lineHeight: 1.6, marginBottom: 20 }}>
+              Your password is set. You're signed in.
+            </p>
+            <Btn full onClick={onDone}>Enter <ArrowRight size={15} /></Btn>
+          </Card>
+        ) : (
+          <Card pad={24} style={{ textAlign: "left" }}>
+            {email && (
+              <p style={{ fontFamily: T.body, fontSize: 13, color: T.muted, lineHeight: 1.55, marginBottom: 18 }}>
+                Setting a new password for <strong style={{ color: T.bronzeLt }}>{email}</strong>.
+              </p>
+            )}
+            <label style={lblStyle}>New Password</label>
+            <div style={{ position: "relative", marginBottom: 6 }}>
+              <Lock size={16} style={iconInInput} />
+              <input style={inputStyle} type="password" value={pw} placeholder="At least 8 characters"
+                onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+            </div>
+            <p style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, marginBottom: 14 }}>
+              Minimum 8 characters.
+            </p>
+            <label style={lblStyle}>Confirm New Password</label>
+            <div style={{ position: "relative", marginBottom: 18 }}>
+              <Lock size={16} style={iconInInput} />
+              <input style={inputStyle} type="password" value={pw2} placeholder="••••••••"
+                onChange={e => setPw2(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+            </div>
+            {err && <p style={{ color: T.emberHot, fontFamily: T.body, fontSize: 13, marginBottom: 12 }}>{err}</p>}
+            <Btn full onClick={submit} disabled={loading}>
+              {loading ? "Setting it…" : <>Set Password <ArrowRight size={15} /></>}
+            </Btn>
+            <p style={{ textAlign: "center", marginTop: 16, color: T.muted2, fontFamily: T.body, fontSize: 12 }}>
+              Didn't ask for this?{" "}
+              <span style={{ color: T.bronzeLt, cursor: "pointer", textDecoration: "underline" }}
+                onClick={bail}>Sign out</span>
+            </p>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ============================================================================
    PROGRAM DATA
@@ -1400,6 +1561,12 @@ export default function App() {
     return isIOS && !isStandalone;
   });
   const [previewMember, setPreviewMember] = useState(false);
+  // Set synchronously on first render, before supabase-js finishes parsing and
+  // clearing the URL fragment. Belt and braces with the PASSWORD_RECOVERY event
+  // below - whichever fires first, we catch the recovery.
+  const [recovering, setRecovering] = useState(
+    () => typeof window !== "undefined" && window.location.hash.includes("type=recovery")
+  );
 
   const streak = profile?.streak ?? 0;
   const user = session?.user
@@ -1409,7 +1576,15 @@ export default function App() {
   // auth session bootstrap + listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthReady(true); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); setView("dashboard"); });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s);
+      // A recovery link produces a REAL session. Without this branch the man is
+      // dropped straight into the dashboard on his old password and is never
+      // asked to change it - the reset silently accomplishes nothing.
+      if (event === "PASSWORD_RECOVERY") { setRecovering(true); return; }
+      if (event === "SIGNED_OUT") { setRecovering(false); }
+      setView("dashboard");
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -1453,6 +1628,12 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: T.obsidian, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Crest size={48} />
     </div>
+  );
+  if (recovering && user) return (
+    <ResetPassword
+      email={user.email}
+      onDone={() => { setRecovering(false); setView("dashboard"); }}
+    />
   );
   if (!user) return <Login />;
 
