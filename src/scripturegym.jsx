@@ -1203,23 +1203,51 @@ function ProposeContentScreen({ user, onBack }) {
   );
 }
 
-export function ScriptureGymApp({ user, role, profile }) {
-  const [tab, setTab] = useState("sessions");
+/* Which inner screen the sub-route names. These used to be seven separate
+   booleans held in component state, which meant the browser had no idea they
+   existed: Back exited Scripture Gym entirely instead of stepping back one
+   screen, and a refresh dropped you at the gym door. They are now segments of
+   the URL, so Back, Forward, refresh and the Android hardware button all work,
+   and an inner screen can be linked to directly. */
+const GYM_PANELS = {
+  progress:       "progress",
+  trainingwheels: "trainingwheels",
+  cohorts:        "cohorts",
+  leaderboard:    "leaderboard",
+  mygroups:       "mygroups",
+  biblesearch:    "biblesearch",
+  propose:        "propose",
+};
+
+export function ScriptureGymApp({ user, role, profile, sub, onSub, onBack }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [groups, setGroups] = useState({ official: [], personal: [] });
   const [stats, setStats] = useState(null);
-  const [selectedGroup, setSelectedGroup] = useState(null);
   const [workoutVerses, setWorkoutVerses] = useState(null);
-  const [showProgress, setShowProgress] = useState(false);
-  const [showTrainingWheels, setShowTrainingWheels] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
-  const [showCohorts, setShowCohorts] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showMyGroups, setShowMyGroups] = useState(false);
-  const [showBibleSearch, setShowBibleSearch] = useState(false);
-  const [showProposeContent, setShowProposeContent] = useState(false);
+
+  /* Everything below is DERIVED from the sub-route rather than stored.
+     Routes: <null> | training | progress | trainingwheels | cohorts |
+             leaderboard | mygroups | biblesearch | propose |
+             group/<id> | group/<id>/workout                                */
+  const seg        = (sub || "").split("/").filter(Boolean);
+  const panel      = GYM_PANELS[seg[0]] || null;
+  const groupId    = seg[0] === "group" ? seg[1] : null;
+  const inWorkout  = seg[0] === "group" && seg[2] === "workout";
+  const tab        = seg[0] === "training" ? "training" : "sessions";
+  const setTab     = (t) => onSub(t === "training" ? "training" : null);
+  const allGroups  = [...(groups.official || []), ...(groups.personal || [])];
+  const selectedGroup = groupId ? allGroups.find(g => String(g.id) === String(groupId)) || null : null;
+
+  // A workout cannot be resumed from a cold URL - the verse set lives in
+  // memory. Land such a link on the group instead of a blank screen.
+  const showWorkout = inWorkout && !!workoutVerses;
+
+  const openPanel  = (k) => onSub(k);
+  const openGroup  = (g) => onSub(`group/${g.id}`);
+  const startWorkout = (verses) => { setWorkoutVerses(verses); onSub(`group/${groupId}/workout`); };
   const isLeader = role === "owner" || role === "admin" || role === "cohort_leader";
   const isAdminOrOwner = role === "owner" || role === "admin";
   // `role` is already masked when the owner is previewing as a member, so the
@@ -1256,9 +1284,52 @@ export function ScriptureGymApp({ user, role, profile }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const addGroup = async () => {
+    if (!newGroupName.trim()) return;
+    setAddingGroup(true);
+    const { error } = await createMuscleGroup(user.id, newGroupName);
+    setAddingGroup(false);
+    if (!error) { setNewGroupName(""); load(); }
+  };
+
+  // onBack goes through the app's history so the in-screen Back button and the
+  // browser Back button stay in step instead of fighting each other.
+  if (panel === "progress")       return <ProgressScreen user={user} onBack={onBack} />;
+  if (panel === "trainingwheels") return <TrainingWheelsPage onBack={onBack} />;
+  if (panel === "cohorts")        return <CohortsScreen user={user} onBack={onBack} />;
+  if (panel === "leaderboard")    return <LeaderboardScreen user={user} onBack={onBack} />;
+  if (panel === "mygroups")       return <MyCohortFeedsScreen user={user} onBack={onBack} />;
+  if (panel === "biblesearch")    return <BibleSearchScreen onBack={onBack} />;
+  if (panel === "propose")        return <ProposeContentScreen user={user} onBack={onBack} />;
+
+  if (selectedGroup && showWorkout) {
+    return (
+      <WorkoutSession
+        group={selectedGroup}
+        verses={workoutVerses}
+        user={user}
+        onBack={onBack}
+        onFinish={() => { setWorkoutVerses(null); onSub(null); load(); }}
+      />
+    );
+  }
+
+  if (selectedGroup) {
+    return (
+      <MuscleGroupDetail
+        group={selectedGroup}
+        user={user}
+        onBack={() => { load(); onBack(); }}
+        onStartWorkout={startWorkout}
+      />
+    );
+  }
+
   // Sessions is the default landing: live workouts are time-sensitive in a way
-  // that verse drilling is not.
-  if (tab === "sessions") {
+  // that verse drilling is not. This sits AFTER the inner-screen branches on
+  // purpose - a sub-route like /progress must win over the default tab, or
+  // opening Progress would silently render the Sessions tab instead.
+  if (tab === "sessions" && !panel && !groupId) {
     return (
       <Wrap>
         <Head kicker="The Gym" title="Scripture Gym"
@@ -1269,62 +1340,17 @@ export function ScriptureGymApp({ user, role, profile }) {
     );
   }
 
-  const addGroup = async () => {
-    if (!newGroupName.trim()) return;
-    setAddingGroup(true);
-    const { error } = await createMuscleGroup(user.id, newGroupName);
-    setAddingGroup(false);
-    if (!error) { setNewGroupName(""); load(); }
-  };
-
-  if (showProgress) {
-    return <ProgressScreen user={user} onBack={() => setShowProgress(false)} />;
-  }
-
-  if (showTrainingWheels) {
-    return <TrainingWheelsPage onBack={() => setShowTrainingWheels(false)} />;
-  }
-
-  if (showCohorts) {
-    return <CohortsScreen user={user} onBack={() => setShowCohorts(false)} />;
-  }
-
-  if (showLeaderboard) {
-    return <LeaderboardScreen user={user} onBack={() => setShowLeaderboard(false)} />;
-  }
-
-  if (showMyGroups) {
-    return <MyCohortFeedsScreen user={user} onBack={() => setShowMyGroups(false)} />;
-  }
-
-  if (showBibleSearch) {
-    return <BibleSearchScreen onBack={() => setShowBibleSearch(false)} />;
-  }
-
-  if (showProposeContent) {
-    return <ProposeContentScreen user={user} onBack={() => setShowProposeContent(false)} />;
-  }
-
-  if (selectedGroup && workoutVerses) {
+  // A group id that no longer resolves (deleted, or a stale link) - don't hang
+  // on a blank screen, drop back to the gym floor.
+  if (groupId && !loading && !selectedGroup) {
     return (
-      <WorkoutSession
-        group={selectedGroup}
-        verses={workoutVerses}
-        user={user}
-        onBack={() => setWorkoutVerses(null)}
-        onFinish={() => { setWorkoutVerses(null); setSelectedGroup(null); load(); }}
-      />
-    );
-  }
-
-  if (selectedGroup) {
-    return (
-      <MuscleGroupDetail
-        group={selectedGroup}
-        user={user}
-        onBack={() => { setSelectedGroup(null); load(); }}
-        onStartWorkout={setWorkoutVerses}
-      />
+      <Wrap>
+        <Head kicker="The Gym" title="Scripture Gym" />
+        <Empty>That muscle group is no longer here.</Empty>
+        <div style={{ marginTop: 14 }}>
+          <Btn kind="ghost" onClick={() => onSub(null)}><ChevronLeft size={14} /> Back to the gym</Btn>
+        </div>
+      </Wrap>
     );
   }
 
@@ -1334,13 +1360,13 @@ export function ScriptureGymApp({ user, role, profile }) {
         sub="Train the Word like iron. A place to build, drill, and strengthen scripture memory for the men."
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {SHOW.cohorts && isLeader && <Btn kind="ghost" onClick={() => setShowCohorts(true)}><Users size={14} /> My Cohorts</Btn>}
-            {SHOW.cohorts && <Btn kind="ghost" onClick={() => setShowMyGroups(true)}><Users size={14} /> My Groups</Btn>}
-            {level === "seasoned" && <Btn kind="ghost" onClick={() => setShowBibleSearch(true)}><Search size={14} /> Search Bible</Btn>}
-            {SHOW.proposals && isAdminOrOwner && <Btn kind="ghost" onClick={() => setShowProposeContent(true)}><Sparkles size={14} /> Propose Content</Btn>}
-            {SHOW.leaderboard && <Btn kind="ghost" onClick={() => setShowLeaderboard(true)}><Trophy size={14} /> Leaderboard</Btn>}
-            <Btn kind="ghost" onClick={() => setShowTrainingWheels(true)}><BookOpen size={14} /> Training Wheels</Btn>
-            {!isNew && <Btn kind="ghost" onClick={() => setShowProgress(true)}><TrendingUp size={14} /> Progress</Btn>}
+            {SHOW.cohorts && isLeader && <Btn kind="ghost" onClick={() => openPanel("cohorts")}><Users size={14} /> My Cohorts</Btn>}
+            {SHOW.cohorts && <Btn kind="ghost" onClick={() => openPanel("mygroups")}><Users size={14} /> My Groups</Btn>}
+            {level === "seasoned" && <Btn kind="ghost" onClick={() => openPanel("biblesearch")}><Search size={14} /> Search Bible</Btn>}
+            {SHOW.proposals && isAdminOrOwner && <Btn kind="ghost" onClick={() => openPanel("propose")}><Sparkles size={14} /> Propose Content</Btn>}
+            {SHOW.leaderboard && <Btn kind="ghost" onClick={() => openPanel("leaderboard")}><Trophy size={14} /> Leaderboard</Btn>}
+            <Btn kind="ghost" onClick={() => openPanel("trainingwheels")}><BookOpen size={14} /> Training Wheels</Btn>
+            {!isNew && <Btn kind="ghost" onClick={() => openPanel("progress")}><TrendingUp size={14} /> Progress</Btn>}
             <Btn kind="ghost" onClick={load}><RefreshCw size={14} /> Refresh</Btn>
           </div>
         } />
@@ -1438,7 +1464,7 @@ export function ScriptureGymApp({ user, role, profile }) {
           {sectionLabel("Official Muscle Groups")}
           {groups.official.length === 0
             ? <Empty>No official muscle groups yet.</Empty>
-            : groups.official.map(g => <GroupRow key={g.id} group={g} onClick={setSelectedGroup} />)}
+            : groups.official.map(g => <GroupRow key={g.id} group={g} onClick={openGroup} />)}
 
           <div style={{ marginTop: 22 }}>{sectionLabel("My Muscle Groups")}</div>
           <Card pad={14} style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -1448,7 +1474,7 @@ export function ScriptureGymApp({ user, role, profile }) {
           </Card>
           {groups.personal.length === 0
             ? <Empty>You haven't built your own muscle group yet — add one above.</Empty>
-            : groups.personal.map(g => <GroupRow key={g.id} group={g} onClick={setSelectedGroup} />)}
+            : groups.personal.map(g => <GroupRow key={g.id} group={g} onClick={openGroup} />)}
         </>
       )}
     </Wrap>

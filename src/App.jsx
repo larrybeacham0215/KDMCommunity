@@ -358,14 +358,21 @@ const TOP_VIEWS = [
 function isValidView(v) {
   return TOP_VIEWS.includes(v) || /^admin_[a-z0-9_]+$/.test(v) || /^sys_[a-z0-9_]+$/.test(v);
 }
-function viewFromLocation() {
+// A route is "<view>" or "<view>/<sub>", where sub can itself have segments
+// (scripturegym/group/<id>/workout). The view is the first segment; everything
+// after it belongs to the screen being rendered.
+function routeFromLocation() {
   if (typeof window === "undefined") return null;
   const h = window.location.hash || "";
   // Supabase puts recovery and confirmation tokens in the hash. Never mistake
   // one for a route.
   if (h.includes("access_token") || h.includes("type=recovery") || h.includes("error_description")) return null;
-  const v = h.replace(/^#\/?/, "").trim();
-  return isValidView(v) ? v : null;
+  const raw = h.replace(/^#\/?/, "").trim();
+  if (!raw) return null;
+  const [v, ...rest] = raw.split("/");
+  if (!isValidView(v)) return null;
+  const sub = rest.join("/").replace(/[^A-Za-z0-9_\-/]/g, "");
+  return { view: v, sub: sub || null };
 }
 
 /* ============================================================================
@@ -1579,7 +1586,13 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [view, setView] = useState(() => viewFromLocation() || "dashboard");
+  const [view, setViewRaw] = useState(() => routeFromLocation()?.view || "dashboard");
+  // Sub-path within the current screen. Scripture Gym uses it so its inner
+  // screens (Progress, Leaderboard, a muscle group, a workout) are real history
+  // entries instead of invisible component state.
+  const [sub, setSub] = useState(() => routeFromLocation()?.sub || null);
+  // Moving to a top-level screen always starts at that screen's root.
+  const setView = (v) => { setViewRaw(v); setSub(null); };
   const [menu, setMenu] = useState(false);
   const [checkins, setCheckins] = useState([]);
   const [progress] = useState({ p30: 12, p90: 27 });
@@ -1624,7 +1637,7 @@ export default function App() {
       // INITIAL_SESSION fires on every load and is not a navigation either.
       const isNewLogin = !!s && !hadSession.current && event === "SIGNED_IN";
       hadSession.current = !!s;
-      if (isNewLogin) setView(viewFromLocation() || "dashboard");
+      if (isNewLogin) { const r = routeFromLocation(); setViewRaw(r?.view || "dashboard"); setSub(r?.sub || null); }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -1638,7 +1651,7 @@ export default function App() {
     // rewriting it here could erase the token before that finishes.
     const h = window.location.hash || "";
     if (h.includes("access_token") || h.includes("type=recovery") || h.includes("error_description")) return;
-    const target = `#/${view}`;
+    const target = `#/${view}${sub ? "/" + sub : ""}`;
     if (window.location.hash === target) return;
     if (didRoute.current) {
       window.history.pushState({ kdmView: view }, "", target);
@@ -1647,13 +1660,15 @@ export default function App() {
       window.history.replaceState({ kdmView: view }, "", target);
       didRoute.current = true;
     }
-  }, [view]);
+  }, [view, sub]);
 
   // URL -> view. Fires on browser Back/Forward and on Android's hardware Back.
   useEffect(() => {
     const onPop = () => {
       if (navDepth.current > 0) navDepth.current -= 1;
-      setView(viewFromLocation() || "dashboard");
+      const r = routeFromLocation();
+      setViewRaw(r?.view || "dashboard");
+      setSub(r?.sub || null);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -1661,7 +1676,7 @@ export default function App() {
 
   // Moving to a new screen should start at the top of it, not halfway down
   // wherever the last screen was scrolled to.
-  useEffect(() => { window.scrollTo(0, 0); }, [view]);
+  useEffect(() => { window.scrollTo(0, 0); }, [view, sub]);
 
   // load profile for the signed-in user
   useEffect(() => {
@@ -1683,8 +1698,11 @@ export default function App() {
   // Android hardware button. Falls back to the dashboard when we have nothing
   // of our own to pop - so Back never throws a man out of the app entirely.
   const goBack = () => {
-    if (navDepth.current > 0) window.history.back();
-    else setView("dashboard");
+    if (navDepth.current > 0) { window.history.back(); return; }
+    // Nothing of ours to pop - someone opened this URL directly. Step up one
+    // level rather than throwing him out of the screen entirely.
+    if (sub) { setSub(null); return; }
+    setView("dashboard");
   };
 
   // inject fonts + keyframes once
@@ -1785,7 +1803,7 @@ export default function App() {
           style={{ background: "none", border: "none", color: T.bronzeLt, cursor: "pointer", padding: 0, display: "flex" }}>
           <Menu size={24} />
         </button>
-        {view !== "dashboard" && (
+        {(view !== "dashboard" || sub) && (
           <button onClick={goBack} aria-label="Back"
             style={{
               background: "none", border: "none", color: T.bronzeLt, cursor: "pointer",
@@ -1812,7 +1830,7 @@ export default function App() {
 
       <main style={{ padding: "26px 18px 60px" }}>
         {view === "dashboard" && <Dashboard user={user} go={setView} streak={streak} progress={progress} staff={staff} />}
-        {view === "scripturegym" && <ScriptureGymApp user={user} role={previewMember ? "member" : profile?.role} profile={profile} />}
+        {view === "scripturegym" && <ScriptureGymApp user={user} role={previewMember ? "member" : profile?.role} profile={profile} sub={sub} onSub={setSub} onBack={goBack} />}
         {staff && view === "p30" && <ProgramPage program={PROGRAMS.p30} go={setView} progress={progress} />}
         {staff && view === "p90" && <ProgramPage program={PROGRAMS.p90} go={setView} progress={progress} />}
         {staff && view === "checkin" && <CheckIn checkins={checkins} addCheckin={c => setCheckins(s => [c, ...s])} onStreak={bumpStreak} />}
