@@ -3,7 +3,7 @@ import {
   Menu, X, Flame, ShieldCheck, BookOpen, CalendarCheck, Compass,
   Video, Upload, Square, Play, ChevronRight, ChevronDown, LogOut, User,
   CheckCircle2, Circle, Quote, ArrowRight, Lock, Mail, NotebookPen, Target,
-  Server, Dumbbell, LibraryBig, ExternalLink, Route
+  Server, Dumbbell, LibraryBig, ExternalLink, Route, ChevronLeft
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Crest, Eyebrow, Btn, Card, Field, inputBase, firstName } from "./ui";
@@ -337,6 +337,35 @@ function ResetPassword({ email, onDone }) {
       </div>
     </div>
   );
+}
+
+/* ============================================================================
+   ROUTING
+   The app is a single page at /app/ driven by one `view` string. Without a URL
+   to anchor it, the browser Back button, the Android hardware Back button and
+   a page refresh all had nothing to work with. These helpers mirror `view`
+   into the URL hash.
+
+   Hash and not path: GitHub Pages serves the repo's root 404.html for any
+   unknown path, so /app/resources would render the marketing homepage with a
+   404 status. A hash never leaves the /app/ path, so it needs no server
+   config and cannot 404.
+   ========================================================================== */
+const TOP_VIEWS = [
+  "dashboard", "scripturegym", "resources", "path", "profile",
+  "p30", "p90", "checkin", "systems", "gideon",
+];
+function isValidView(v) {
+  return TOP_VIEWS.includes(v) || /^admin_[a-z0-9_]+$/.test(v) || /^sys_[a-z0-9_]+$/.test(v);
+}
+function viewFromLocation() {
+  if (typeof window === "undefined") return null;
+  const h = window.location.hash || "";
+  // Supabase puts recovery and confirmation tokens in the hash. Never mistake
+  // one for a route.
+  if (h.includes("access_token") || h.includes("type=recovery") || h.includes("error_description")) return null;
+  const v = h.replace(/^#\/?/, "").trim();
+  return isValidView(v) ? v : null;
 }
 
 /* ============================================================================
@@ -1550,7 +1579,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState(() => viewFromLocation() || "dashboard");
   const [menu, setMenu] = useState(false);
   const [checkins, setCheckins] = useState([]);
   const [progress] = useState({ p30: 12, p90: 27 });
@@ -1567,6 +1596,9 @@ export default function App() {
   const [recovering, setRecovering] = useState(
     () => typeof window !== "undefined" && window.location.hash.includes("type=recovery")
   );
+  const hadSession = useRef(false);   // distinguishes a real sign-in from a token refresh
+  const didRoute   = useRef(false);   // first URL write replaces, later ones push
+  const navDepth   = useRef(0);       // how many entries WE pushed, so Back never exits the app
 
   const streak = profile?.streak ?? 0;
   const user = session?.user
@@ -1582,11 +1614,54 @@ export default function App() {
       // dropped straight into the dashboard on his old password and is never
       // asked to change it - the reset silently accomplishes nothing.
       if (event === "PASSWORD_RECOVERY") { setRecovering(true); return; }
-      if (event === "SIGNED_OUT") { setRecovering(false); }
-      setView("dashboard");
+      if (event === "SIGNED_OUT") {
+        setRecovering(false); hadSession.current = false; setView("dashboard"); return;
+      }
+      // Only a genuine sign-in moves the man. This listener used to call
+      // setView("dashboard") on EVERY event - and TOKEN_REFRESHED fires each
+      // time the tab regains focus, so switching to another browser tab and
+      // back silently threw him from wherever he was to the dashboard.
+      // INITIAL_SESSION fires on every load and is not a navigation either.
+      const isNewLogin = !!s && !hadSession.current && event === "SIGNED_IN";
+      hadSession.current = !!s;
+      if (isNewLogin) setView(viewFromLocation() || "dashboard");
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // view -> URL. First render replaces (so Back never lands on a blank entry);
+  // every later change pushes, which is what gives the browser and the Android
+  // hardware Back button something to return to.
+  useEffect(() => {
+    // Never touch the hash while an auth callback is sitting in it. Supabase
+    // parses the recovery/confirmation token out of the fragment on load, and
+    // rewriting it here could erase the token before that finishes.
+    const h = window.location.hash || "";
+    if (h.includes("access_token") || h.includes("type=recovery") || h.includes("error_description")) return;
+    const target = `#/${view}`;
+    if (window.location.hash === target) return;
+    if (didRoute.current) {
+      window.history.pushState({ kdmView: view }, "", target);
+      navDepth.current += 1;
+    } else {
+      window.history.replaceState({ kdmView: view }, "", target);
+      didRoute.current = true;
+    }
+  }, [view]);
+
+  // URL -> view. Fires on browser Back/Forward and on Android's hardware Back.
+  useEffect(() => {
+    const onPop = () => {
+      if (navDepth.current > 0) navDepth.current -= 1;
+      setView(viewFromLocation() || "dashboard");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // Moving to a new screen should start at the top of it, not halfway down
+  // wherever the last screen was scrolled to.
+  useEffect(() => { window.scrollTo(0, 0); }, [view]);
 
   // load profile for the signed-in user
   useEffect(() => {
@@ -1603,6 +1678,14 @@ export default function App() {
   };
 
   const logout = async () => { setMenu(false); await supabase.auth.signOut(); };
+
+  // Back. Prefers real history so it stays in step with the browser and the
+  // Android hardware button. Falls back to the dashboard when we have nothing
+  // of our own to pop - so Back never throws a man out of the app entirely.
+  const goBack = () => {
+    if (navDepth.current > 0) window.history.back();
+    else setView("dashboard");
+  };
 
   // inject fonts + keyframes once
   useEffect(() => {
@@ -1698,10 +1781,26 @@ export default function App() {
         padding: "14px 18px", background: "rgba(248,247,244,.88)", backdropFilter: "blur(10px)",
         borderBottom: `1px solid ${T.line}`,
       }}>
-        <button onClick={() => setMenu(true)} style={{ background: "none", border: "none", color: T.bronzeLt, cursor: "pointer" }}><Menu size={24} /></button>
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <button onClick={() => setMenu(true)} aria-label="Open menu"
+          style={{ background: "none", border: "none", color: T.bronzeLt, cursor: "pointer", padding: 0, display: "flex" }}>
+          <Menu size={24} />
+        </button>
+        {view !== "dashboard" && (
+          <button onClick={goBack} aria-label="Back"
+            style={{
+              background: "none", border: "none", color: T.bronzeLt, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 2, padding: "4px 6px 4px 0",
+              fontFamily: T.reg, fontSize: 13, letterSpacing: ".04em",
+            }}>
+            <ChevronLeft size={20} /> Back
+          </button>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
           <Crest size={26} />
-          <span style={{ fontFamily: T.reg, fontSize: 13.5, letterSpacing: ".06em", color: T.cream }}>{titles[view]}</span>
+          <span style={{
+            fontFamily: T.reg, fontSize: 13.5, letterSpacing: ".06em", color: T.cream,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>{titles[view]}</span>
         </div>
         <div
           onClick={() => { if (staff) setView("checkin"); }}
