@@ -391,28 +391,12 @@ async function s256(verifier: string): Promise<string> {
   return b64url(digest);
 }
 
-function htmlPage(body: string, status = 200): Response {
-  return new Response(
-    `<!doctype html><html><head><meta charset="utf-8">
-     <meta name="viewport" content="width=device-width,initial-scale=1">
-     <title>Connect Claude — Kingdom of Disciplined Men</title>
-     <style>
-       body{background:#0e0e0e;color:#cfc8bd;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-            display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
-       .card{background:#161514;border:1px solid #2a2723;border-radius:10px;padding:32px;max-width:400px;width:100%}
-       h1{font-size:19px;color:#e8e2d8;margin:0 0 6px}
-       p{font-size:13.5px;color:#8a8175;line-height:1.55;margin:0 0 20px}
-       label{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#b8863b;margin:14px 0 6px}
-       input{width:100%;box-sizing:border-box;background:#0e0e0e;border:1px solid #2a2723;border-radius:6px;
-             padding:11px 12px;color:#e8e2d8;font-size:14px}
-       button{width:100%;margin-top:22px;background:#b8863b;color:#0e0e0e;border:0;border-radius:6px;
-              padding:12px;font-size:14px;font-weight:600;cursor:pointer}
-       .err{background:rgba(180,60,50,.14);border:1px solid rgba(180,60,50,.45);color:#e5a9a2;
-            border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:16px}
-       .ok{color:#b8863b;font-size:14px}
-     </style></head><body><div class="card">${body}</div></body></html>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
+const LOGIN_PAGE = "https://kdmcommunity.com/connect-claude.html";
+
+function jsonCors(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status, headers: { ...CORS, "Content-Type": "application/json" },
+  });
 }
 
 /** Sign in against Supabase auth, then require Super Admin. */
@@ -454,72 +438,54 @@ async function handleRegister(req: Request): Promise<Response> {
 }
 
 async function handleAuthorize(req: Request, url: URL): Promise<Response> {
-  // GET carries the parameters in the query string; POST carries them in the
-  // form body. Read whichever applies before validating.
-  let clientId: string, redirectUri: string, state: string, challenge: string;
-  let email = "", password = "";
+  // GET -> bounce the browser to the sign-in page hosted on kdmcommunity.com,
+  // carrying the OAuth parameters along. Supabase cannot serve HTML itself.
+  if (req.method === "GET") {
+    const dest = new URL(LOGIN_PAGE);
+    for (const k of ["client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method"]) {
+      const v = url.searchParams.get(k);
+      if (v) dest.searchParams.set(k, v);
+    }
+    return Response.redirect(dest.toString(), 302);
+  }
 
-  if (req.method === "POST") {
-    const fd = await req.formData();
-    clientId = String(fd.get("client_id") ?? "");
-    redirectUri = String(fd.get("redirect_uri") ?? "");
-    state = String(fd.get("state") ?? "");
-    challenge = String(fd.get("code_challenge") ?? "");
-    email = String(fd.get("email") ?? "");
-    password = String(fd.get("password") ?? "");
+  // POST -> the sign-in page submits JSON here and gets JSON back.
+  let p: Record<string, string> = {};
+  const ct = req.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) {
+    p = await req.json();
   } else {
-    const p = url.searchParams;
-    clientId = p.get("client_id") ?? "";
-    redirectUri = p.get("redirect_uri") ?? "";
-    state = p.get("state") ?? "";
-    challenge = p.get("code_challenge") ?? "";
+    const fd = await req.formData();
+    for (const [k, v] of fd.entries()) p[k] = String(v);
   }
 
+  const clientId = p.client_id ?? "";
+  const redirectUri = p.redirect_uri ?? "";
+  const state = p.state ?? "";
+  const challenge = p.code_challenge ?? "";
   if (!clientId || !redirectUri) {
-    return htmlPage("<h1>Invalid request</h1><p>Missing client_id or redirect_uri.</p>", 400);
+    return jsonCors({ ok: false, error: "Missing client_id or redirect_uri." }, 400);
   }
 
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  const hidden =
-    '<input type="hidden" name="client_id" value="' + esc(clientId) + '">' +
-    '<input type="hidden" name="redirect_uri" value="' + esc(redirectUri) + '">' +
-    '<input type="hidden" name="state" value="' + esc(state) + '">' +
-    '<input type="hidden" name="code_challenge" value="' + esc(challenge) + '">';
-
-  const form = (err?: string) => htmlPage(
-    "<h1>Connect Claude to the Kingdom</h1>" +
-    "<p>Sign in with your Super Admin account. This grants Claude access to the KDM platform.</p>" +
-    (err ? '<div class="err">' + err + "</div>" : "") +
-    '<form method="POST">' + hidden +
-    '<label>Email</label><input name="email" type="email" autocomplete="username" required>' +
-    '<label>Password</label><input name="password" type="password" autocomplete="current-password" required>' +
-    '<button type="submit">Authorize Claude</button></form>',
-    err ? 401 : 200,
-  );
-
-  if (req.method === "GET") return form();
-
-  const owner = await verifyOwner(email, password);
-  if (!owner) return form("Sign-in failed, or that account is not a Super Admin.");
+  const owner = await verifyOwner(p.email ?? "", p.password ?? "");
+  if (!owner) {
+    return jsonCors({ ok: false, error: "Sign-in failed, or that account is not a Super Admin." }, 401);
+  }
 
   const code = rand(32);
   await q(
     "INSERT INTO public.mcp_oauth_codes (code, client_id, redirect_uri, code_challenge, user_id, user_email, expires_at) VALUES (" +
       lit(code) + ", " + lit(clientId) + ", " + lit(redirectUri) + ", " +
-      lit(challenge) + ", " + lit(owner.id) + ", " + lit(email) +
+      lit(challenge) + ", " + lit(owner.id) + ", " + lit(p.email ?? "") +
       ", now() + interval '10 minutes')", false,
   );
   await auditLog("MCP connector authorized via OAuth",
-    "Super Admin " + email + " authorized a Claude client (" + clientId + ").");
+    "Super Admin " + (p.email ?? "") + " authorized a Claude client (" + clientId + ").");
 
   const dest = new URL(redirectUri);
   dest.searchParams.set("code", code);
   if (state) dest.searchParams.set("state", state);
-  return htmlPage(
-    '<h1>Authorized</h1><p class="ok">Returning you to Claude…</p>' +
-    '<script>location.href=' + JSON.stringify(dest.toString()) + ";</script>" +
-    '<p><a style="color:#b8863b" href="' + esc(dest.toString()) + '">Continue</a></p>',
-  );
+  return jsonCors({ ok: true, redirect: dest.toString() });
 }
 
 async function handleToken(req: Request): Promise<Response> {

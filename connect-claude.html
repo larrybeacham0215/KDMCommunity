@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect Claude &mdash; Kingdom of Disciplined Men</title>
+<style>
+  *{box-sizing:border-box}
+  body{background:#0e0e0e;color:#cfc8bd;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+       display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
+  .card{background:#161514;border:1px solid #2a2723;border-radius:10px;padding:32px;max-width:400px;width:100%}
+  h1{font-size:19px;color:#e8e2d8;margin:0 0 6px;font-weight:600}
+  p{font-size:13.5px;color:#8a8175;line-height:1.55;margin:0 0 20px}
+  label{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#b8863b;margin:14px 0 6px}
+  input{width:100%;background:#0e0e0e;border:1px solid #2a2723;border-radius:6px;padding:11px 12px;color:#e8e2d8;font-size:14px}
+  input:focus{outline:none;border-color:#b8863b}
+  button{width:100%;margin-top:22px;background:#b8863b;color:#0e0e0e;border:0;border-radius:6px;
+         padding:12px;font-size:14px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .err{background:rgba(180,60,50,.14);border:1px solid rgba(180,60,50,.45);color:#e5a9a2;
+       border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:16px;display:none}
+  .ok{color:#b8863b;font-size:14px;margin-top:16px;display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Connect Claude to the Kingdom</h1>
+  <p>Sign in with your Super Admin account. This grants Claude access to the KDM platform.</p>
+  <div class="err" id="err"></div>
+  <form id="f">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit" id="btn">Authorize Claude</button>
+  </form>
+  <div class="ok" id="ok">Authorized. Returning you to Claude&hellip;</div>
+</div>
+<script>
+  var ENDPOINT = "https://cibevunbazujwvhqhkro.supabase.co/functions/v1/kdm-mcp/oauth/authorize";
+  var qs = new URLSearchParams(location.search);
+  var err = document.getElementById("err"), ok = document.getElementById("ok"), btn = document.getElementById("btn");
+
+  if (!qs.get("client_id") || !qs.get("redirect_uri")) {
+    err.textContent = "This page was opened without the required parameters. Start from Claude's Connect button.";
+    err.style.display = "block";
+    document.getElementById("f").style.display = "none";
+  }
+
+  document.getElementById("f").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    err.style.display = "none";
+    btn.disabled = true; btn.textContent = "Signing in\u2026";
+    try {
+      var res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: qs.get("client_id"),
+          redirect_uri: qs.get("redirect_uri"),
+          state: qs.get("state") || "",
+          code_challenge: qs.get("code_challenge") || "",
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value
+        })
+      });
+      var data = await res.json();
+      if (data && data.ok && data.redirect) {
+        document.getElementById("f").style.display = "none";
+        ok.style.display = "block";
+        location.href = data.redirect;
+        return;
+      }
+      err.textContent = (data && data.error) || "Something went wrong. Try again.";
+      err.style.display = "block";
+    } catch (ex) {
+      err.textContent = "Could not reach the server. Check your connection and try again.";
+      err.style.display = "block";
+    }
+    btn.disabled = false; btn.textContent = "Authorize Claude";
+  });
+</script>
+</body>
+</html>
