@@ -3,7 +3,7 @@ import {
   Users, Brain, NotebookPen, Bot, Cpu, ScrollText, Plug, Workflow, Webhook,
   KeyRound, Activity, LayoutGrid, Plus, Trash2, Save, RefreshCw, Power,
   Send, Shield, Sparkles, ChevronRight, ChevronLeft, X, AlertTriangle, Circle, CheckCircle2,
-  Dumbbell, Pencil, ClipboardList, Radio,
+  Dumbbell, Pencil, ClipboardList, Radio, Compass, Target, Check,
 } from "lucide-react";
 import { supabase } from "./dataService";
 import { T, Eyebrow, Btn, Card, inputBase, Field } from "./ui";
@@ -19,6 +19,7 @@ export const OWNER_NAV = [
   { id: "admin_memories", label: "Memories", icon: Brain },
   { id: "admin_notepad", label: "Notepad", icon: NotebookPen },
   { id: "gideon", label: "Gideon AI", icon: Bot },
+  { id: "jethro", label: "Jethro", icon: Compass, privateTo: "fbe9fa8d-693f-4c20-a09e-a9c0747f18b9" },
   { id: "admin_robots", label: "Robots", icon: Cpu },
   { id: "admin_constitution", label: "AI Constitution", icon: ScrollText },
   { id: "admin_scripture_gym", label: "Scripture Gym", icon: Dumbbell },
@@ -37,7 +38,7 @@ export const SYSTEMS_SUB = [
 export const ADMIN_TITLES = {
   admin_users: "Members & Roles", admin_memories: "Memories", admin_notepad: "Notepad",
   admin_roster: "The Roster",
-  gideon: "Gideon AI", admin_robots: "Robots", admin_constitution: "AI Constitution",
+  gideon: "Gideon AI", jethro: "Jethro", admin_robots: "Robots", admin_constitution: "AI Constitution",
   admin_scripture_gym: "Scripture Gym",
   systems: "Systems", sys_overview: "Systems · Overview", sys_integrations: "Systems · Integrations",
   sys_automations: "Systems · Automations", sys_webhooks: "Systems · Webhooks",
@@ -449,6 +450,172 @@ function Gideon() {
   );
 }
 
+
+/* ===========================================================================
+   JETHRO — Larry's private business counsel.
+   Named for Exodus 18: the counselor who told Moses to stop being the
+   bottleneck. Visible only to the user in robots.private_to_user_id; the
+   edge function re-checks caller identity regardless of what the UI does.
+   ========================================================================= */
+function Jethro({ profile }) {
+  const [robot, setRobot] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [commitments, setCommitments] = useState([]);
+  const [threadId, setThreadId] = useState(null);
+  const [text, setText] = useState("");
+  const [msgs, setMsgs] = useState([]);
+  const [sending, setSending] = useState(false);
+  const scroller = useRef(null);
+
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, [msgs, sending]);
+
+  const loadCommitments = useCallback(async () => {
+    const { data } = await supabase.from("counsel_commitments")
+      .select("*").eq("status", "open").order("created_at", { ascending: false });
+    setCommitments(data || []);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("robots").select("*").ilike("name", "jethro").maybeSingle();
+      setRobot(data || null);
+      await loadCommitments();
+      setLoading(false);
+    })();
+  }, [loadCommitments]);
+
+  const ensureThread = async () => {
+    if (threadId) return threadId;
+    const { data } = await supabase.from("counsel_threads")
+      .insert({ user_id: profile?.id, robot_id: robot?.id, title: new Date().toLocaleDateString() })
+      .select().maybeSingle();
+    setThreadId(data?.id || null);
+    return data?.id || null;
+  };
+
+  const send = async () => {
+    const content = text.trim();
+    if (!content || sending) return;
+    const next = [...msgs, { role: "user", content }];
+    setMsgs(next); setText(""); setSending(true);
+    try {
+      const tid = await ensureThread();
+      if (tid) await supabase.from("counsel_messages").insert({ thread_id: tid, user_id: profile?.id, role: "user", content });
+
+      const { data, error } = await supabase.functions.invoke("jethro", { body: { messages: next } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setMsgs(m => [...m, { role: "assistant", content: data.reply }]);
+
+      if (tid) {
+        await supabase.from("counsel_messages").insert({ thread_id: tid, user_id: profile?.id, role: "assistant", content: data.reply });
+        await supabase.from("counsel_threads").update({ updated_at: new Date().toISOString() }).eq("id", tid);
+      }
+      if (data?.commitment) {
+        await supabase.from("counsel_commitments").insert({ user_id: profile?.id, thread_id: tid, commitment: data.commitment });
+        await loadCommitments();
+      }
+    } catch (e) {
+      setMsgs(m => [...m, { role: "assistant", content: "⚠ " + (e?.message || "Jethro couldn't respond just now. Try again."), error: true }]);
+    } finally { setSending(false); }
+  };
+
+  const resolve = async (c, status) => {
+    setCommitments(cs => cs.filter(x => x.id !== c.id));
+    await supabase.from("counsel_commitments")
+      .update({ status, resolved_at: new Date().toISOString() }).eq("id", c.id);
+    logUpdate(profile?.email || "owner", `Commitment ${status}`, c.commitment);
+  };
+
+  if (loading) return <Wrap><Loading /></Wrap>;
+  if (!robot) return <Wrap><Empty>Jethro isn't configured yet.</Empty></Wrap>;
+
+  return (
+    <Wrap>
+      <Head kicker="Command · Counsel" title="Jethro"
+        sub="Your private business counsel. He sees the real platform numbers before he answers — and he remembers what you said you'd do." />
+
+      <Card pad={18} style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+          <div style={{ width: 46, height: 46, borderRadius: 10, background: "radial-gradient(circle,rgba(156,106,36,.16),transparent 70%)", border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Compass size={24} color={T.bronzeLt} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: T.display, fontSize: 20, color: T.cream }}>Jethro</div>
+            <div style={{ fontFamily: T.body, fontSize: 12.5, color: T.muted }}>{robot.model} · private to you</div>
+          </div>
+          <Shield size={18} color={T.bronze} title="Governed by the AI Constitution" />
+        </div>
+        <p style={{ fontFamily: T.body, fontSize: 13.5, color: T.muted, lineHeight: 1.55, marginTop: 12 }}>
+          Exodus 18 — the counselor who watched Moses judge every case alone from morning to evening and told him plainly: what you are doing is not good, you will wear yourself out. Then handed him a structure.
+        </p>
+      </Card>
+
+      {commitments.length > 0 && (
+        <Card pad={16} style={{ marginBottom: 16, borderColor: "rgba(156,106,36,.35)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Target size={16} color={T.bronze} />
+            <span style={{ fontFamily: T.display, fontSize: 15, color: T.cream, letterSpacing: .3 }}>WHAT YOU SAID YOU'D DO</span>
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {commitments.map(c => (
+              <div key={c.id} style={{ display: "flex", gap: 10, alignItems: "center", background: T.surface2, border: `1px solid ${T.lineSoft}`, borderRadius: 8, padding: "10px 12px" }}>
+                <span style={{ flex: 1, fontFamily: T.body, fontSize: 13.5, color: T.cream, lineHeight: 1.45 }}>{c.commitment}</span>
+                <span style={{ fontFamily: T.body, fontSize: 11.5, color: T.muted2, flexShrink: 0 }}>{String(c.created_at).slice(0, 10)}</span>
+                <button onClick={() => resolve(c, "done")} title="Done"
+                  style={{ background: "none", border: `1px solid ${T.line}`, borderRadius: 6, padding: "4px 6px", cursor: "pointer", color: T.ok, flexShrink: 0 }}><Check size={14} /></button>
+                <button onClick={() => resolve(c, "dropped")} title="Drop"
+                  style={{ background: "none", border: `1px solid ${T.line}`, borderRadius: 6, padding: "4px 6px", cursor: "pointer", color: T.muted2, flexShrink: 0 }}><X size={14} /></button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <Card pad={0} style={{ overflow: "hidden" }}>
+        <div ref={scroller} style={{ padding: 18, maxHeight: 460, minHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(231,171,76,.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Compass size={15} color={T.bronzeLt} /></div>
+            <div style={{ background: T.surface2, border: `1px solid ${T.lineSoft}`, borderRadius: "2px 10px 10px 10px", padding: "11px 14px", maxWidth: "82%" }}>
+              <p style={{ fontFamily: T.body, fontSize: 14, color: T.cream, lineHeight: 1.5 }}>
+                I have your current numbers in front of me. Tell me what you're stuck on — or ask me what I'd be worried about if I were you.
+              </p>
+            </div>
+          </div>
+
+          {msgs.map((m, i) => m.role === "user" ? (
+            <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ background: "rgba(200,134,46,.16)", border: `1px solid ${T.line}`, borderRadius: "10px 2px 10px 10px", padding: "11px 14px", maxWidth: "82%" }}>
+                <p style={{ fontFamily: T.body, fontSize: 14, color: T.cream, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.content}</p>
+              </div>
+            </div>
+          ) : (
+            <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(231,171,76,.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Compass size={15} color={m.error ? T.emberHot : T.bronzeLt} /></div>
+              <div style={{ background: T.surface2, border: `1px solid ${m.error ? "rgba(212,80,43,.4)" : T.lineSoft}`, borderRadius: "2px 10px 10px 10px", padding: "11px 14px", maxWidth: "82%" }}>
+                <p style={{ fontFamily: T.body, fontSize: 14, color: m.error ? T.emberLt : T.cream, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.content}</p>
+              </div>
+            </div>
+          ))}
+
+          {sending && (
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(231,171,76,.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Compass size={15} color={T.bronzeLt} /></div>
+              <span style={{ fontFamily: T.body, fontSize: 13, color: T.muted2 }}>Jethro is reading your numbers…</span>
+            </div>
+          )}
+        </div>
+        <div style={{ borderTop: `1px solid ${T.lineSoft}`, padding: 12, display: "flex", gap: 10, alignItems: "center", background: T.obsidian }}>
+          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
+            placeholder="What are you stuck on?" style={inputBase} />
+          <Btn onClick={send} disabled={sending || !text.trim()}><Send size={15} /></Btn>
+        </div>
+      </Card>
+    </Wrap>
+  );
+}
+
 /* ===========================================================================
    ROBOTS
    ========================================================================= */
@@ -828,6 +995,7 @@ export function AdminScreen({ view, profile }) {
   if (view === "admin_memories") return <Memories profile={profile} />;
   if (view === "admin_notepad") return <Notepad profile={profile} />;
   if (view === "gideon") return <Gideon />;
+  if (view === "jethro") return <Jethro profile={profile} />;
   if (view === "admin_robots") return <Robots profile={profile} />;
   if (view === "admin_constitution") return <Constitution />;
   if (view === "admin_scripture_gym") return <CurriculumEditor profile={profile} />;

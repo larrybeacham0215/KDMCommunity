@@ -471,7 +471,7 @@ function SideMenu({ open, onClose, go, view, user, onLogout, isOwner, previewMem
           {showCommand && (
             <>
               {sectionLabel("Command")}
-              {OWNER_NAV.map(it => navBtn(it))}
+              {OWNER_NAV.filter(it => !it.privateTo || it.privateTo === user?.id).map(it => navBtn(it))}
 
               {/* Systems — expandable parent with sub-menu */}
               <button onClick={() => setSysOpen(o => !o)} style={{
