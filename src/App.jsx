@@ -353,7 +353,7 @@ function ResetPassword({ email, onDone }) {
    ========================================================================== */
 const TOP_VIEWS = [
   "dashboard", "scripturegym", "resources", "path", "profile",
-  "p30", "p90", "checkin", "systems", "gideon",
+  "p30", "p90", "checkin", "systems", "gideon", "jethro",
 ];
 function isValidView(v) {
   return TOP_VIEWS.includes(v) || /^admin_[a-z0-9_]+$/.test(v) || /^sys_[a-z0-9_]+$/.test(v);
@@ -1751,7 +1751,7 @@ export default function App() {
       // Turning preview ON while sitting on an owner-only screen would be
       // confusing (nav hidden, but still viewing admin content) — bounce
       // back to a normal member screen instead.
-      if (next && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems" || STAFF_ONLY_VIEWS.includes(view))) {
+      if (next && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "jethro" || view === "systems" || STAFF_ONLY_VIEWS.includes(view))) {
         setView("scripturegym");
       }
       return next;
@@ -1844,9 +1844,9 @@ export default function App() {
         {view === "path" && <PathScreen />}
 
         {/* Owner Command + Systems (UI gate; RLS enforces at the DB regardless) */}
-        {isOwner && !previewMember && (view.startsWith("admin_") || view === "gideon") && <AdminScreen view={view} profile={profile} />}
+        {isOwner && !previewMember && (view.startsWith("admin_") || view === "gideon" || view === "jethro") && <AdminScreen view={view} profile={profile} />}
         {isOwner && !previewMember && (view === "systems" || view.startsWith("sys_")) && <SystemsScreen view={view} go={setView} />}
-        {(!isOwner || previewMember) && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "systems") && (
+        {(!isOwner || previewMember) && (view.startsWith("admin_") || view.startsWith("sys_") || view === "gideon" || view === "jethro" || view === "systems") && (
           <div style={{ maxWidth: 520, margin: "40px auto 0", textAlign: "center" }}>
             <p style={{ fontFamily: T.serif, fontStyle: "italic", color: T.bronzeLt, fontSize: 16 }}>This gate is for the owner alone.</p>
           </div>
