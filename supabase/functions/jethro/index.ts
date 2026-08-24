@@ -19,6 +19,7 @@ const n = (v: unknown) => (typeof v === "number" ? v : 0);
 async function buildContext(admin: any) {
   const today = new Date();
   const iso = (d: Date) => d.toISOString();
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
   const daysAgo = (k: number) => new Date(today.getTime() - k * 864e5);
 
   const [tiers, new7, new30, apps, meetings, regs, reps, log, notes, commits] = await Promise.all([
@@ -26,9 +27,9 @@ async function buildContext(admin: any) {
     admin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", iso(daysAgo(7))),
     admin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", iso(daysAgo(30))),
     admin.from("applications").select("status,created_at").order("created_at", { ascending: false }).limit(50),
-    admin.from("gym_meetings").select("id,title,starts_at").gte("starts_at", iso(daysAgo(30))).order("starts_at", { ascending: false }).limit(20),
+    admin.from("gym_meetings").select("id,title,scheduled_at,status").gte("scheduled_at", iso(daysAgo(30))).order("scheduled_at", { ascending: false }).limit(20),
     admin.from("gym_meeting_registrations").select("id", { count: "exact", head: true }).gte("created_at", iso(daysAgo(30))),
-    admin.from("daily_rep_log").select("id", { count: "exact", head: true }).gte("created_at", iso(daysAgo(7))),
+    admin.from("daily_rep_log").select("user_id", { count: "exact", head: true }).gte("rep_date", ymd(daysAgo(7))),
     admin.from("update_log").select("actor,summary,created_at").order("created_at", { ascending: false }).limit(15),
     admin.from("notepad").select("title,body,updated_at").order("updated_at", { ascending: false }).limit(5),
     admin.from("counsel_commitments").select("commitment,status,due_date,created_at").eq("status", "open").order("created_at", { ascending: false }).limit(10),
