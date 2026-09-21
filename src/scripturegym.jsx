@@ -1398,7 +1398,7 @@ export function ScriptureGymApp({ user, role, profile, sub, onSub, onBack }) {
             {[
               ["Muscle groups", "Verses grouped by what they work — marriage, fatherhood, temper, purity. Pick the one that names your weakest area."],
               ["Workouts", "Choose a few verses and drill them. Quiz yourself with the words hidden. Mark one memorized when it is actually in you."],
-              ["Monday nights", "The room meets at 7:00 PM ET. We study together, then you carry that week's verse into your own training."],
+              ["Live sessions", "Paused for now while the process is rebuilt. Keep training on your own; the room will be back."],
             ].map(([h, b], i) => (
               <div key={i} style={{ display: "flex", gap: 13, padding: "11px 0",
                 borderTop: `1px solid ${T.lineSoft}` }}>
