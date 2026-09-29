@@ -214,6 +214,186 @@ const TOOLS = [
 
 // ------------------------------------------------------------ tool handlers
 
+// ============================================================ SCOPED KEYS
+// A scoped key (public.mcp_scoped_keys) grants a narrow, revocable slice of
+// this server to another tool — first use: Grok. Only the SHA-256 is stored.
+//
+// SCOPE content_read:
+//   * NO raw SQL. The caller never writes a query; the server builds it from an
+//     allowlisted table, validated column names and escaped values.
+//   * Content and config only. Nothing that belongs to a man: no profiles,
+//     emails, check-ins, progress, Gap answers (applications), Jethro counsel,
+//     Notepad, memories, notifications, invites, or OAuth secrets.
+//   * Every call is written to update_log as actor 'grok-mcp'.
+
+async function sha256Hex(s: string): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type ScopedKey = { id: string; label: string; scope: string };
+
+async function scopedKeyFor(candidate: string): Promise<ScopedKey | null> {
+  if (!candidate || candidate.length < 20 || candidate.length > 200) return null;
+  const h = await sha256Hex(candidate);
+  const r = await rows(
+    "SELECT id, label, scope FROM public.mcp_scoped_keys WHERE key_hash = " + lit(h) +
+    " AND revoked = false LIMIT 1",
+  );
+  return r.length ? (r[0] as ScopedKey) : null;
+}
+
+/** Content the curriculum is built from. BASE_FILTER hides anything a single
+ *  man created for himself inside an otherwise-shared table. */
+const READABLE: Record<string, { about: string; base?: string }> = {
+  daily_reps:            { about: "The 42 rotating daily reps (weekday x variant)." },
+  path_programs:         { about: "The Path programs." },
+  path_weeks:            { about: "The eight weeks of the Path." },
+  app_resources:         { about: "Library shelves: Watch / Read / Do." },
+  scripture_gym_content: { about: "Editable gym copy, including Training Wheels." },
+  verse_of_day_pool:     { about: "Verse-of-the-day rotation pool." },
+  ai_constitution:       { about: "The AI Constitution governing Gideon." },
+  gym_recurring_series:  { about: "Recurring Open Gym configuration." },
+  bible_verses:          { about: "Full BSB Bible, one row per verse (31k rows — filter it)." },
+  muscle_groups:         { about: "OFFICIAL muscle groups only.", base: "owner_type = 'official'" },
+  verses:                { about: "Verses in OFFICIAL muscle groups only.",
+    base: "muscle_group_id IN (SELECT id FROM public.muscle_groups WHERE owner_type = 'official')" },
+  robots:                { about: "Shared AI assistants (private ones hidden).",
+    base: "private_to_user_id IS NULL" },
+};
+
+const IDENT = /^[a-z_][a-z0-9_]{0,62}$/;
+
+async function columnsOf(table: string): Promise<string[]> {
+  const r = await rows(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=" +
+    lit(table) + " ORDER BY ordinal_position",
+  );
+  return r.map((x: any) => String(x.column_name)).filter((c) => c !== "search_vector");
+}
+
+async function scopedRead(args: Record<string, any>): Promise<string> {
+  const table = String(args.table ?? "");
+  const spec = READABLE[table];
+  if (!spec) {
+    return "Not available with this key. Readable tables: " + Object.keys(READABLE).join(", ") + ".";
+  }
+  const cols = await columnsOf(table);
+
+  let select = cols.join(", ");
+  if (Array.isArray(args.columns) && args.columns.length) {
+    const want = args.columns.map(String);
+    const bad = want.filter((c: string) => !IDENT.test(c) || !cols.includes(c));
+    if (bad.length) return "Unknown column(s) on " + table + ": " + bad.join(", ") + ". Columns: " + cols.join(", ");
+    select = want.join(", ");
+  }
+
+  const where: string[] = [];
+  if (spec.base) where.push("(" + spec.base + ")");
+  if (args.filters && typeof args.filters === "object" && !Array.isArray(args.filters)) {
+    for (const [c, v] of Object.entries(args.filters)) {
+      if (!IDENT.test(c) || !cols.includes(c)) return "Unknown filter column: " + c;
+      if (v === null) where.push(c + " IS NULL");
+      else if (typeof v === "boolean") where.push(c + " = " + (v ? "true" : "false"));
+      else where.push(c + "::text = " + lit(String(v)));
+    }
+  }
+
+  let order = "";
+  if (args.order_by) {
+    const ob = String(args.order_by);
+    if (!IDENT.test(ob) || !cols.includes(ob)) return "Unknown order_by column: " + ob;
+    order = " ORDER BY " + ob + (args.desc ? " DESC" : " ASC");
+  }
+
+  const lim = Math.min(Math.max(parseInt(String(args.limit ?? 50), 10) || 50, 1), 200);
+  const sql = "SELECT " + select + " FROM public." + table +
+    (where.length ? " WHERE " + where.join(" AND ") : "") + order + " LIMIT " + lim;
+  return renderRows(await rows(sql));
+}
+
+async function scopedOverview(): Promise<string> {
+  const t = await rows("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'");
+  let site = "unknown", portal = "unknown", bundle = "unknown";
+  try { site = String((await fetch("https://kdmcommunity.com/")).status); } catch (_e) { site = "unreachable"; }
+  try {
+    const r = await fetch("https://kdmcommunity.com/app/");
+    portal = String(r.status);
+    bundle = (await r.text()).match(/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? "not found";
+  } catch (_e) { portal = "unreachable"; }
+  const lines = [
+    "KDM — READ-ONLY CONTENT ACCESS",
+    "==============================",
+    "Site    https://kdmcommunity.com       HTTP " + site,
+    "Portal  https://kdmcommunity.com/app/  HTTP " + portal,
+    "Bundle  " + bundle,
+    "Tables  " + (t[0]?.n ?? "?") + " in schema public",
+    "",
+    "Stack: React 18 + Vite 5, inline styles from a token object (src/ui.jsx),",
+    "Supabase Postgres + RLS, Deno edge functions, pg_cron, GitHub Pages.",
+    "Code: github.com/larrybeacham0215/KDMCommunity (separate GitHub access).",
+    "",
+    "READABLE WITH THIS KEY (kdm_read):",
+  ];
+  for (const [k, v] of Object.entries(READABLE)) lines.push("  " + k.padEnd(22) + v.about);
+  lines.push("", "Member data is not reachable with this key, by design.");
+  return lines.join("\n");
+}
+
+const SCOPED_TOOLS = [
+  {
+    name: "kdm_overview",
+    description: "Start here. Site/portal health, the tech stack, and which content tables this key can read.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "kdm_schema",
+    description: "Database structure only (no data). No args: list tables. With a table: its columns and RLS policies.",
+    inputSchema: {
+      type: "object",
+      properties: { table: { type: "string", description: "Optional table name." } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "kdm_read",
+    description: "Read rows from an allowlisted CONTENT table (curriculum, config, the Bible). Read-only. No member data. " +
+      "Call kdm_overview for the list of tables.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table: { type: "string", enum: Object.keys(READABLE) },
+        columns: { type: "array", items: { type: "string" }, description: "Optional column list." },
+        filters: { type: "object", description: "Optional equality filters, e.g. {\"weekday\": 1}." },
+        order_by: { type: "string" },
+        desc: { type: "boolean" },
+        limit: { type: "integer", minimum: 1, maximum: 200, description: "Default 50." },
+      },
+      required: ["table"],
+      additionalProperties: false,
+    },
+  },
+];
+
+async function callScopedTool(key: ScopedKey, name: string, args: Record<string, any>): Promise<string> {
+  if (key.scope !== "content_read") return "This key's scope is not recognised.";
+  let out: string;
+  if (name === "kdm_overview") out = await scopedOverview();
+  else if (name === "kdm_schema") out = await callTool("kdm_schema", args); // structure only, no rows
+  else if (name === "kdm_read") out = await scopedRead(args);
+  else return "Not available with this key.";
+
+  try {
+    await q("UPDATE public.mcp_scoped_keys SET last_used_at = now(), use_count = use_count + 1 WHERE id = " + lit(key.id), false);
+    await q(
+      "INSERT INTO public.update_log (actor, summary, detail) VALUES ('grok-mcp', " +
+      lit((key.label + " → " + name).slice(0, 300)) + ", " + lit(JSON.stringify(args).slice(0, 4000)) + ")",
+      false,
+    );
+  } catch (_e) { /* auditing must never break a read */ }
+  return out;
+}
+
 async function callTool(name: string, args: Record<string, any>): Promise<string> {
   if (name === "kdm_status") {
     const tables = await rows(
@@ -612,7 +792,14 @@ Deno.serve(async (req: Request) => {
   // Either a valid OAuth bearer token, or the legacy path secret (kept so the
   // endpoint stays testable with curl and usable by non-OAuth clients).
   const pathSecretOk = !!TOKEN && timingSafeEqual(seg1, TOKEN);
-  if (!pathSecretOk && !(await bearerOk(req))) return unauthorized();
+  let scoped: ScopedKey | null = null;
+  if (!pathSecretOk && !(await bearerOk(req))) {
+    // Not a full-access caller. Is it a scoped key — in the path, or as a
+    // Bearer header (Grok's API sends `authorization`)?
+    const hdr = (req.headers.get("authorization") ?? "").match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
+    scoped = (await scopedKeyFor(seg1)) ?? (await scopedKeyFor(hdr));
+    if (!scoped) return unauthorized();
+  }
 
   if (req.method === "GET") return json({ error: "method not allowed" }, 405);
   if (req.method === "DELETE") return new Response(null, { status: 204, headers: CORS });
@@ -632,8 +819,10 @@ Deno.serve(async (req: Request) => {
         protocolVersion: typeof requested === "string" ? requested : DEFAULT_PROTOCOL,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions:
-          "Tools for the Kingdom of Disciplined Men platform (Supabase + GitHub Pages). " +
+        instructions: scoped
+          ? "Read-only CONTENT access to the Kingdom of Disciplined Men platform: curriculum, " +
+            "configuration and the Bible. No member data is reachable. Call kdm_overview first."
+          : "Tools for the Kingdom of Disciplined Men platform (Supabase + GitHub Pages). " +
           "These tools bypass row-level security and can read every member's private data, " +
           "so treat member information as confidential and never surface one member's data to " +
           "another. Prefer kdm_status and kdm_schema before querying. Always show the user the " +
@@ -641,7 +830,7 @@ Deno.serve(async (req: Request) => {
       }));
     }
     if (method === "ping") return json(rpcResult(id, {}));
-    if (method === "tools/list") return json(rpcResult(id, { tools: TOOLS }));
+    if (method === "tools/list") return json(rpcResult(id, { tools: scoped ? SCOPED_TOOLS : TOOLS }));
     if (method === "resources/list") return json(rpcResult(id, { resources: [] }));
     if (method === "prompts/list") return json(rpcResult(id, { prompts: [] }));
 
@@ -654,9 +843,12 @@ Deno.serve(async (req: Request) => {
         }));
       }
       const nm = params?.name;
-      if (!TOOLS.some((t) => t.name === nm)) return json(rpcError(id, -32602, "Unknown tool: " + nm));
+      const allowed = scoped ? SCOPED_TOOLS : TOOLS;
+      if (!allowed.some((t) => t.name === nm)) return json(rpcError(id, -32602, "Unknown tool: " + nm));
       try {
-        const text = await callTool(nm, params?.arguments ?? {});
+        const text = scoped
+          ? await callScopedTool(scoped, nm, params?.arguments ?? {})
+          : await callTool(nm, params?.arguments ?? {});
         return json(rpcResult(id, { content: [{ type: "text", text }] }));
       } catch (e) {
         return json(rpcResult(id, {
